@@ -90,14 +90,9 @@ const classes = new Set(
 for (const name of classes) {
   assert.ok(splashCss.includes('.' + name), `boot.css 里缺少 .${name}，但 boot.js 会用到它`)
 }
-for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff', 'dshs-beam']) {
+for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff']) {
   assert.ok(splashCss.includes('.' + layer), `boot.css 里缺少 .${layer}，这一层画面不该被删掉`)
 }
-// 进入主界面那道横扫光束：关键帧必须在，而且要由 html.dshs-boot-out 触发。
-// 它挂在 body 上、不在 #dshs 里 —— 放进启动页会被那层淡出一起带走（reduce 下只有 0.2s），播不完。
-assert.ok(splashCss.includes('@keyframes dshs-beam'), 'boot.css 要有 dshs-beam 关键帧（进入主界面的光束）')
-assert.ok(/html\.dshs-boot-out \.dshs-beam\s*\{[^}]*animation:\s*dshs-beam/.test(splashCss), '光束要由 html.dshs-boot-out 触发')
-assert.ok(js.includes("className = 'dshs-beam'") && js.includes('doc.body.appendChild(beam)'), 'boot.js 要把光束挂到 body 上，不能塞进 #dshs')
 // 低配机友好：这两样是掉帧主因。只提醒不拦——机器好的话想加回来是自由的。
 if (/\.dshs-bg\s*\{[^}]*filter:/.test(splashCss)) {
   console.log('… 注意：启动页背景挂了全屏 filter（blur），低配机上会明显掉帧')

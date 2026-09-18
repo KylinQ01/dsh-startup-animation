@@ -2,8 +2,8 @@
    规则全部挂在 #dshs / html.dshs-* 上，动画收尾时整段样式会被移除，不给主界面留残留。
 
    画面分三层（都只跑 transform / translate / opacity，合成器友好，不触发重排）：
-     远景 .dshs-world   背景图推近 → 极光色块漂移 → 光束缓慢旋转 → 星尘闪烁 → 光点上浮 → 流星掠过 → 斜向光带
-     中景              提亮面纱 + 呼吸暗角
+     远景 .dshs-world   背景图推近 → 极光色块漂移 → 星尘闪烁 → 光点上浮 → 流星掠过 → 斜向光带
+     中景              提亮面纱 + 暗角 + 跟随指针的暖光
      近景 .dshs-stage   头像（回弹入场 + 玻璃反光扫过 + 上下浮动）、逐字文案、渐变下划线、状态小字、进度条
    入场按一条时间轴依次点亮，常驻的循环各自错开周期，避免整屏一起"呼吸"；
    --dshs-px / --dshs-py 由 boot.js 跟随指针写入，各层按深度换算成位移，做出视差纵深。 */
@@ -226,70 +226,6 @@ html.dshs-boot #root { opacity: 0; }
   transition: opacity 1.1s ease .35s, translate .5s cubic-bezier(.22, .61, .36, 1);
 }
 #dshs.is-in.is-aim .dshs-cursor { opacity: 1; }
-
-/* 进入主界面时横扫整屏的光束：白亮芯 + 粉色内辉 + 淡紫外辉（参考品牌片里那道横光，
-   但配色走可爱系）。它从屏幕正中向两侧铺开，主界面各模块就在这道光里拼上来，最后散开淡掉。
-
-   它是**独立一层挂在 body 上**（不在 #dshs 里），由 html.dshs-boot-out 触发：
-   若放进启动页里，启动页整层淡到 opacity 0 时会把光带一起带走
-   （"减少动态效果"下那只有 0.2s，820ms 的横扫根本播不完）。
-
-   ⚠️ 参考图是"黑底上一道亮光"，我们是**浅色壁纸**——纯亮的横带压在浅底上几乎看不见。
-   所以这里垫了一层明显的暗带（淡紫、透明度 .22，亮芯处留空）：亮芯要有暗对比才立得住，
-   这是把"黑底亮光"搬到浅底上的关键一步。
-   只有一条渐变层、只跑 transform + opacity，纯合成，低配机也吃得下。 */
-.dshs-beam {
-  position: fixed;
-  left: -3%;
-  right: -3%;
-  top: 50%;
-  height: 40vmin;
-  margin-top: -20vmin;
-  z-index: 2147483100;
-  pointer-events: none;
-  background:
-    /* 核心亮线：很窄的纯白芯，两侧立刻转粉，保证边缘锐利 */
-    linear-gradient(180deg,
-      rgba(255, 255, 255, 0) 48.7%,
-      rgba(255, 200, 230, 1) 49.55%,
-      #fff 49.95%,
-      #fff 50.05%,
-      rgba(255, 200, 230, 1) 50.45%,
-      rgba(255, 255, 255, 0) 51.3%),
-    /* 粉色内辉 */
-    linear-gradient(180deg,
-      rgba(255, 160, 208, 0) 32%,
-      rgba(255, 160, 208, .42) 46%,
-      rgba(255, 190, 224, .55) 50%,
-      rgba(255, 160, 208, .42) 54%,
-      rgba(255, 160, 208, 0) 68%),
-    /* 暗对比带：浅色底上全靠它把亮芯托出来 */
-    linear-gradient(180deg,
-      rgba(112, 80, 144, 0) 1%,
-      rgba(112, 80, 144, .22) 39%,
-      rgba(112, 80, 144, 0) 48.4%,
-      rgba(112, 80, 144, 0) 51.6%,
-      rgba(112, 80, 144, .22) 61%,
-      rgba(112, 80, 144, 0) 99%),
-    /* 淡紫外辉 */
-    linear-gradient(180deg,
-      rgba(206, 170, 232, 0) 3%,
-      rgba(206, 170, 232, .3) 38%,
-      rgba(206, 170, 232, .3) 62%,
-      rgba(206, 170, 232, 0) 97%);
-  opacity: 0;
-  transform: scaleX(0);
-  transform-origin: 50% 50%;
-}
-/* 从正中向两侧"打开"→ 铺满后停一拍最亮 → 再纵向散开淡掉（由收尾时加上的 html.dshs-boot-out 触发） */
-html.dshs-boot-out .dshs-beam { animation: dshs-beam .82s cubic-bezier(.2, .8, .3, 1) both; }
-@keyframes dshs-beam {
-  0% { opacity: 0; transform: scaleX(0) scaleY(.35); }
-  12% { opacity: 1; transform: scaleX(1) scaleY(.5); }
-  34% { opacity: 1; transform: scaleX(1) scaleY(.95); }
-  70% { opacity: .5; transform: scaleX(1) scaleY(1.8); }
-  100% { opacity: 0; transform: scaleX(1) scaleY(2.8); }
-}
 
 /* 暗角：四角轻轻压暗，把视线收在正中。
    不呼吸——全屏不透明度动画等于整段时长都在混合整屏像素，低配机上不值。 */
@@ -672,7 +608,7 @@ html.dshs-boot-out .dshs-beam { animation: dshs-beam .82s cubic-bezier(.2, .8, .
 /* 系统开了「减少动态效果」时：
    **关掉**的是一切"会一直动"和"跟着人动"的东西 —— 星尘/光点/流星、极光漂移、柔光呼吸、
    加载环旋转、头像浮动、玻璃反光、指针视差与 3D 倾斜、背景推近；
-   **保留**的是一次性的入场：进入主界面那道光带、模块组装（行程由 boot.js 收到 35%）、启动页淡出。
+   **保留**的是一次性的入场：模块组装（行程由 boot.js 收到 35%）与启动页淡出。
    理由是这条设置针对的是大位移、视差、持续旋转这类容易引发不适的动效，
    而不是"入场不许有任何动画"——全砍掉的结果就是这台机器上什么都看不见。 */
 @media (prefers-reduced-motion: reduce) {
