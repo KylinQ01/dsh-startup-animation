@@ -1,13 +1,16 @@
-/* 主界面壁纸（图二）。和启动页同一张图——启动页淡出后背景只是"由虚转实"，过场因此接得上。
+/* 主界面壁纸（图二）。和启动页同一张图——启动页收尾会把它收到 1:1 再交接，所以接得上。
    这份样式不参与启动页收尾清理，常驻整个页面生命周期。
 
    做法只有两条：把外壳底色变量改透明、把侧栏底色变量改成半透白，壁纸画在 body 上。
    面板、卡片、代码块、下拉菜单用的都是别的变量，一律保持不透明——文字永远落在 ≥78% 白底上，
    所以壁纸再花也不会影响可读性。
-   深色主题不套用：浅色壁纸配浅色文字会糊成一片，切到深色就还是原来的深色界面。 */
+   深色主题不套用：浅色壁纸配浅色文字会糊成一片，切到深色就还是原来的深色界面。
+
+   `background-attachment: fixed` 也去掉了：这个应用没有整页滚动，固不固定肉眼看不出区别，
+   但 fixed 背景在某些机器上会走更慢的合成路径。 */
 
 html body:not([data-ds-dark-theme]) {
-  /* 图片上压的那层白纱。启动页收尾「对焦」时会用同一组变量把白度补齐（见 boot.css 的
+  /* 图片上压的那层白纱。启动页收尾会用同一组变量把白度补齐（见 boot.css 的
      .dshs-handoff），所以改浓淡只改这两个值，两边一起变。 */
   --dshs-wall-veil-a: rgba(253, 250, 254, .8);
   --dshs-wall-veil-b: rgba(250, 247, 253, .68);
@@ -15,5 +18,5 @@ html body:not([data-ds-dark-theme]) {
   --dsw-specific-sidebar-fill: rgba(255, 255, 255, .78);
   background:
     linear-gradient(var(--dshs-wall-veil-a), var(--dshs-wall-veil-b)),
-    url("/dsh-startup/bg") center / cover no-repeat fixed #f7f1f8;
+    url("/dsh-startup/bg") center / cover no-repeat #f7f1f8;
 }

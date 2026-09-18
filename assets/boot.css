@@ -10,10 +10,11 @@
 
 html.dshs-boot { background: #f7f1f8; }
 
-/* 启动页盖着的时候先把主界面藏起来；换成 .dshs-boot-out 后它从"稍大一点、略低一点"
+/* 启动页盖着的时候先把主界面藏起来；换成 .dshs-boot-out 后它从"略低一点"的位置
    归位并淡入，和背景的收束同拍（都是 700ms）：背景往回收、内容往上落，
-   这一下才看得出是一个转场，而不是一次硬切。 */
-html.dshs-boot #root { opacity: 0; transform: scale(1.035) translateY(10px); }
+   这一下才看得出是一个转场，而不是一次硬切。
+   只做 translateY、不做 scale：主界面是整棵子树，缩放它等于每帧重栅格化整个界面。 */
+html.dshs-boot #root { opacity: 0; transform: translateY(10px); }
 html.dshs-boot #root,
 html.dshs-boot-out #root {
   transform-origin: 50% 42%;
@@ -50,8 +51,11 @@ html.dshs-boot-out #root {
 #dshs .dshs-streaks { position: absolute; inset: 0; }
 
 /* 背景图（图二）：**盒子就是视口，故意不留富余**——这样 `object-fit: cover` 的取景和
-   主界面壁纸（body 上的 `center / cover fixed`）逐像素一致，收尾时两张图才能严丝合缝地接上。
+   主界面壁纸（body 上的 `center / cover`）逐像素一致，收尾时两张图才能严丝合缝地接上。
    （以前这里套了两层 inset 富余，等于放大了约 14%，于是交接那一下会"跳"。）
+
+   **这里刻意不加任何 filter**：全屏 blur 在低配机上是最贵的一项，而且这张图一边缩放
+   一边带滤镜，等于每帧都要重算整屏模糊。"背景退远"的观感交给白纱与暗角去做。
 
    推近用**慢 transition** 而不是 CSS animation：animation 一旦被撤掉，属性会瞬间跳到目标值，
    收尾那段"往回 settle"就完全看不见了；transition 会从当前插值接着往下走。
@@ -61,7 +65,6 @@ html.dshs-boot-out #root {
   inset: 0;
   opacity: 0;
   transform: scale(1.075);
-  filter: blur(6px) saturate(1.06) brightness(1.01);
   translate: calc(var(--dshs-px) * -10px) calc(var(--dshs-py) * -8px);
   transition: opacity .8s ease, translate .55s cubic-bezier(.22, .61, .36, 1);
 }
@@ -72,7 +75,9 @@ html.dshs-boot-out #root {
   transition: opacity .8s ease, translate .55s cubic-bezier(.22, .61, .36, 1), transform 26s ease-out;
 }
 
-/* 极光：三团大范围柔光（纯径向渐变，不用 blur 滤镜），各自以不同周期漂移缩放。 */
+/* 极光：两团大范围柔光（纯径向渐变，不用 blur 滤镜），各自缓慢漂移。
+   **只做 translate，不做 scale**：柔光一旦被缩放，浏览器就得按新尺寸重新栅格化这一大层，
+   而平移是纯合成操作，基本不要钱。 */
 #dshs .dshs-aurora { position: absolute; inset: 0; }
 #dshs .dshs-aurora i {
   position: absolute;
@@ -83,68 +88,32 @@ html.dshs-boot-out #root {
 }
 #dshs.is-in .dshs-aurora i { opacity: 1; }
 #dshs .dshs-aurora i:nth-child(1) {
-  left: -18%; top: -26%; width: 74vmax; height: 74vmax;
-  background: radial-gradient(circle, rgba(255, 190, 222, .5), rgba(255, 190, 222, 0) 64%);
-  animation: dshs-aura-a 26s ease-in-out infinite;
+  left: -16%; top: -24%; width: 58vmax; height: 58vmax;
+  background: radial-gradient(circle, rgba(255, 190, 222, .52), rgba(255, 190, 222, 0) 64%);
+  animation: dshs-aura-a 30s ease-in-out infinite;
 }
 #dshs .dshs-aurora i:nth-child(2) {
-  right: -20%; top: -12%; width: 66vmax; height: 66vmax;
-  background: radial-gradient(circle, rgba(188, 176, 244, .45), rgba(188, 176, 244, 0) 64%);
-  animation: dshs-aura-b 33s ease-in-out infinite;
-}
-#dshs .dshs-aurora i:nth-child(3) {
-  left: 10%; bottom: -32%; width: 82vmax; height: 82vmax;
-  background: radial-gradient(circle, rgba(255, 236, 214, .42), rgba(255, 236, 214, 0) 66%);
-  animation: dshs-aura-c 40s ease-in-out infinite;
+  right: -18%; bottom: -26%; width: 52vmax; height: 52vmax;
+  background: radial-gradient(circle, rgba(188, 176, 244, .46), rgba(188, 176, 244, 0) 64%);
+  animation: dshs-aura-b 38s ease-in-out infinite;
 }
 @keyframes dshs-aura-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(6vmax, 3vmax, 0) scale(1.14); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(5vmax, 3vmax, 0); }
 }
 @keyframes dshs-aura-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1.06); }
-  50% { transform: translate3d(-5vmax, 4vmax, 0) scale(0.94); }
-}
-@keyframes dshs-aura-c {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(0.96); }
-  50% { transform: translate3d(4vmax, -3vmax, 0) scale(1.1); }
-}
-
-/* 光束：一整圈放射状白光，靠径向遮罩只在中间一段显形，然后极慢地转。 */
-#dshs .dshs-rays {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 132vmax;
-  height: 132vmax;
-  margin: -66vmax 0 0 -66vmax;
-  background: conic-gradient(from 0deg,
-    rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, .34) 4deg, rgba(255, 255, 255, 0) 11deg,
-    rgba(255, 255, 255, 0) 44deg, rgba(255, 255, 255, .26) 49deg, rgba(255, 255, 255, 0) 57deg,
-    rgba(255, 255, 255, 0) 96deg, rgba(255, 255, 255, .3) 101deg, rgba(255, 255, 255, 0) 110deg,
-    rgba(255, 255, 255, 0) 158deg, rgba(255, 255, 255, .22) 163deg, rgba(255, 255, 255, 0) 171deg,
-    rgba(255, 255, 255, 0) 214deg, rgba(255, 255, 255, .28) 219deg, rgba(255, 255, 255, 0) 228deg,
-    rgba(255, 255, 255, 0) 272deg, rgba(255, 255, 255, .24) 277deg, rgba(255, 255, 255, 0) 286deg,
-    rgba(255, 255, 255, 0) 328deg, rgba(255, 255, 255, .26) 333deg, rgba(255, 255, 255, 0) 342deg,
-    rgba(255, 255, 255, 0) 360deg);
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 5%, rgba(0, 0, 0, .78) 26%, rgba(0, 0, 0, 0) 58%);
-  mask-image: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 5%, rgba(0, 0, 0, .78) 26%, rgba(0, 0, 0, 0) 58%);
-  opacity: 0;
-  transition: opacity 1.2s ease .3s;
-}
-#dshs.is-in .dshs-rays { opacity: .5; animation: dshs-spin 54s linear infinite; }
-@keyframes dshs-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-4vmax, -3vmax, 0); }
 }
 
 /* 星尘：数量、位置、大小、亮度、周期都由 boot.js 随机给出，呼吸相位用负延迟错开。
-   浅色壁纸上纯白点看不见，所以做成"白芯 + 淡紫光晕"，在浅底上也能读出来。 */
+   浅色壁纸上纯白点看不见，所以做成"白芯 + 淡紫光晕"，在浅底上也能读出来。
+   只留一层小光晕——阴影数量减半，低配机上少一半绘制。 */
 #dshs .dshs-star {
   position: absolute;
   border-radius: 50%;
   background: radial-gradient(circle, #fff 0%, #fff 36%, rgba(206, 170, 232, .9) 68%, rgba(206, 170, 232, 0) 100%);
-  box-shadow: 0 0 6px rgba(186, 156, 224, .8), 0 0 14px rgba(255, 196, 224, .55);
+  box-shadow: 0 0 6px rgba(186, 156, 224, .75);
   opacity: 0;
 }
 #dshs.is-in .dshs-star { animation: dshs-twinkle 3s ease-in-out infinite both; }
@@ -159,7 +128,6 @@ html.dshs-boot-out #root {
   bottom: -6vmin;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, .98), rgba(244, 164, 197, .85) 55%, rgba(176, 150, 228, 0) 100%);
-  box-shadow: 0 0 8px rgba(246, 184, 205, .6);
   opacity: 0;
   animation: dshs-float linear infinite;
 }
@@ -237,23 +205,25 @@ html.dshs-boot-out #root {
 
 /* 跟着指针走的暖光：整块画面像有一盏灯跟着你，和视差叠加后纵深更明显。
    用 50vw/50vh 换算，光心就落在指针上；偏暖粉而不是纯白，免得把背景洗白。
-   只在真的动过指针之后才亮（is-aim）——否则它一开始就杵在正中间，会把画面照白。 */
+   只在真的动过指针之后才亮（is-aim）——否则它一开始就杵在正中间，会把画面照白。
+   尺寸压到 42vmax：这一层要跟着指针移动，越大越吃填充率。 */
 #dshs .dshs-cursor {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 70vmax;
-  height: 70vmax;
-  margin: -35vmax 0 0 -35vmax;
+  width: 42vmax;
+  height: 42vmax;
+  margin: -21vmax 0 0 -21vmax;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 216, 238, .28), rgba(255, 216, 238, .09) 42%, rgba(255, 216, 238, 0) 70%);
+  background: radial-gradient(circle, rgba(255, 216, 238, .3), rgba(255, 216, 238, .1) 42%, rgba(255, 216, 238, 0) 70%);
   opacity: 0;
   translate: calc(var(--dshs-px) * 50vw) calc(var(--dshs-py) * 50vh);
   transition: opacity 1.1s ease .35s, translate .5s cubic-bezier(.22, .61, .36, 1);
 }
 #dshs.is-in.is-aim .dshs-cursor { opacity: 1; }
 
-/* 暗角：四角轻轻压暗，并且缓慢呼吸，把视线收在正中。 */
+/* 暗角：四角轻轻压暗，把视线收在正中。
+   不呼吸——全屏不透明度动画等于整段时长都在混合整屏像素，低配机上不值。 */
 #dshs .dshs-vig {
   position: absolute;
   inset: 0;
@@ -261,13 +231,9 @@ html.dshs-boot-out #root {
   opacity: 0;
   transition: opacity 1.3s ease .3s;
 }
-#dshs.is-in .dshs-vig { opacity: 1; animation: dshs-vig 6.4s ease-in-out 1.2s infinite; }
-@keyframes dshs-vig {
-  0%, 100% { opacity: .72; }
-  50% { opacity: 1; }
-}
+#dshs.is-in .dshs-vig { opacity: 1; }
 
-/* 过场闪白：只在「对焦」那 340ms 里轻轻 bloom 一下（足够短，交接前就收干净）。 */
+/* 过场闪白：只在「收住」那一拍轻轻 bloom 一下（足够短，交接前就收干净）。 */
 #dshs .dshs-flash {
   position: absolute;
   inset: 0;
@@ -298,22 +264,23 @@ html.dshs-boot-out #root {
   transition: transform .5s cubic-bezier(.22, .61, .36, 1);
 }
 
-/* 柔光：慢慢呼吸，给正中一点"活着"的感觉。 */
+/* 柔光：慢慢呼吸，给正中一点"活着"的感觉。
+   尺寸收到 52vmin、呼吸幅度收窄：这是全屏里第二大的柔光层，缩放幅度越大越可能要重栅格。 */
 #dshs .dshs-halo {
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 64vmin;
-  height: 64vmin;
+  width: 52vmin;
+  height: 52vmin;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 255, 255, .58), rgba(246, 236, 252, .26) 42%, rgba(255, 255, 255, 0) 70%);
   opacity: 0;
   transition: opacity .9s ease .1s, translate .55s cubic-bezier(.22, .61, .36, 1);
 }
-#dshs.is-in .dshs-halo { opacity: 1; animation: dshs-breath 4.6s ease-in-out 1s infinite; }
+#dshs.is-in .dshs-halo { opacity: 1; animation: dshs-breath 5.2s ease-in-out 1s infinite; }
 @keyframes dshs-breath {
-  0%, 100% { transform: scale(.92); }
-  50% { transform: scale(1.07); }
+  0%, 100% { transform: scale(.96); }
+  50% { transform: scale(1.04); }
 }
 
 /* 两圈转动的加载环：一顺一逆、一大一小，比单调的进度条更像"在转"，也更可爱。 */
@@ -423,12 +390,8 @@ html.dshs-boot-out #root {
     0 30px 70px -20px rgba(120, 90, 160, .55);
 }
 #dshs .dshs-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* 头像自己极慢地"推近"，静止的画面里也有呼吸感。 */
-#dshs.is-in .dshs-avatar img { animation: dshs-portrait-zoom 7s ease-out .1s both; }
-@keyframes dshs-portrait-zoom {
-  from { transform: scale(1.09); }
-  to { transform: scale(1); }
-}
+/* 头像内部那点"缓慢推近"已经去掉：在 overflow:hidden + 圆角里缩放图片，
+   等于每帧都要按新尺寸重新裁一遍，是低配机上很隐蔽的一笔开销。 */
 #dshs .dshs-shine {
   position: absolute;
   inset: -40% -70%;
@@ -443,7 +406,8 @@ html.dshs-boot-out #root {
   22% { opacity: 0; transform: translateX(130%); }
   100% { opacity: 0; transform: translateX(130%); }
 }
-/* 入场用带回弹的曲线；落位后交给轻微的上下浮动。 */
+/* 入场用带回弹的曲线；落位后交给轻微的上下浮动。
+   浮动只做 translateY、不做 scale：头像带三层阴影 + 圆角裁切，缩放会连带重新栅格化。 */
 #dshs.is-in .dshs-avatar {
   opacity: 1;
   transform: none;
@@ -451,8 +415,8 @@ html.dshs-boot-out #root {
   animation: dshs-bob 5.4s ease-in-out 1.1s infinite;
 }
 @keyframes dshs-bob {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-1.4%) scale(1.012); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.6%); }
 }
 
 /* 逐字上浮：一个字一个 span，延迟按顺序错开。 */
@@ -574,9 +538,10 @@ html.dshs-boot-out #root {
 /* ── 过场 ───────────────────────────────────────────────────────────── */
 
 /* 过场是一条 700ms 的时间轴（= boot.js 的 OUT_MS），三件事同时进行、同时收尾：
-     · 背景从 1.075 一路收到 1:1 并拉掉虚化 —— 这是"看得见"的那一下（镜头收住）；
+     · 背景从 1.075 一路收到 1:1 —— 这是"看得见"的那一下（镜头收住）；也因为不再动滤镜，
+       这一拍在低配机上只是纯合成，不产生任何逐帧重绘；
      · 舞台（头像/文案/进度条）前 300ms 先撤；
-     · 整层淡出 + 主界面从 1.035 归位淡入（见文件开头）。
+     · 整层淡出 + 主界面从下方 10px 归位淡入（见文件开头）。
    背景收束用的是 transition 而不是 animation：animation 被撤掉会瞬间跳到目标值，
    那一下动感就没了；transition 会从当前插值接着走。
    收尾终点与主界面壁纸逐像素重合，所以最后摘掉启动页节点时不会跳。
@@ -590,9 +555,8 @@ html.dshs-boot-out #root {
 #dshs.is-out .dshs-bg {
   opacity: 1;
   transform: scale(1);
-  filter: blur(0) saturate(1) brightness(1);
   translate: none;
-  transition: transform .7s cubic-bezier(.4, 0, .2, 1), filter .45s ease, translate .6s cubic-bezier(.4, 0, .2, 1);
+  transition: transform .7s cubic-bezier(.4, 0, .2, 1), translate .6s cubic-bezier(.4, 0, .2, 1);
 }
 #dshs.is-out .dshs-handoff { opacity: 1; transition: opacity .5s ease; }
 #dshs.is-out .dshs-world { translate: none; transition: translate .6s cubic-bezier(.4, 0, .2, 1); }
@@ -606,7 +570,6 @@ html.dshs-boot-out #root {
 #dshs.is-out .dshs-vig,
 #dshs.is-out .dshs-halo,
 #dshs.is-out .dshs-orbit,
-#dshs.is-out .dshs-rays,
 #dshs.is-out .dshs-sheen,
 #dshs.is-out .dshs-petal,
 #dshs.is-out .dshs-star,
@@ -619,7 +582,7 @@ html.dshs-boot-out #root {
   transition: opacity .3s ease;
 }
 #dshs.is-out .dshs-spark { opacity: 0; animation: none; }
-/* 收住那一下轻轻 bloom 一下；.38s 内结束，不参与第二拍的淡出。 */
+/* 收住那一下轻轻 bloom 一下；.38s 内结束，不参与后面的淡出。 */
 #dshs.is-out .dshs-flash { animation: dshs-flash .38s ease-out both; }
 @keyframes dshs-flash {
   0% { opacity: 0; }
@@ -640,9 +603,7 @@ html.dshs-boot-out #root {
 @media (prefers-reduced-motion: reduce) {
   #dshs .dshs-bg,
   #dshs .dshs-aurora i,
-  #dshs .dshs-rays,
   #dshs .dshs-star,
-  #dshs .dshs-vig,
   #dshs .dshs-halo,
   #dshs.is-in .dshs-avatar,
   #dshs.is-in .dshs-ping,
@@ -650,7 +611,6 @@ html.dshs-boot-out #root {
   #dshs.is-in .dshs-shine,
   #dshs.is-in .dshs-orbit,
   #dshs.is-in .dshs-spark,
-  #dshs.is-in .dshs-avatar img,
   #dshs.is-in .dshs-tip i,
   #dshs.is-in .dshs-bar::after,
   #dshs.is-in .dshs-orb { animation: none; }
@@ -672,6 +632,7 @@ html.dshs-boot-out #root {
   #dshs.is-in .dshs-bar,
   #dshs.is-out,
   #dshs.is-out .dshs-bg,
+  #dshs.is-out .dshs-world,
   #dshs.is-out .dshs-handoff,
   #dshs.is-out .dshs-stage {
     transition-duration: .2s;

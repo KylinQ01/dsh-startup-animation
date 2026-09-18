@@ -90,8 +90,15 @@ const classes = new Set(
 for (const name of classes) {
   assert.ok(splashCss.includes('.' + name), `boot.css 里缺少 .${name}，但 boot.js 会用到它`)
 }
-for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-rays', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff']) {
+for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff']) {
   assert.ok(splashCss.includes('.' + layer), `boot.css 里缺少 .${layer}，这一层画面不该被删掉`)
+}
+// 低配机友好：这两样是掉帧主因。只提醒不拦——机器好的话想加回来是自由的。
+if (/\.dshs-bg\s*\{[^}]*filter:/.test(splashCss)) {
+  console.log('… 注意：启动页背景挂了全屏 filter（blur），低配机上会明显掉帧')
+}
+if (splashCss.includes('mask-image')) {
+  console.log('… 注意：启动页用了 mask（大层遮罩混合），低配机上会明显掉帧')
 }
 // 收尾交接靠"启动页背景 == 主界面壁纸"：白纱必须来自同一组变量，且主界面那张图也是 cover
 assert.ok(wallCss.includes('--dshs-wall-veil-a') && wallCss.includes('--dshs-wall-veil-b'), '壁纸白纱要定义成变量，供收尾那层复用')

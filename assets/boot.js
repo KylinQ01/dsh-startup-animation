@@ -25,9 +25,9 @@
   var GRACE_MS = 520   // 主界面已挂载后多等一拍，等它画完再撤
   var MAX_MS = 5000    // 兜底：最多挡住主界面这么久
   var OUT_MS = 700     // 过场时长，与 boot.css 的 .is-out 保持一致
-  var PETALS = 16      // 上浮光点数量
-  var STARS = 30       // 星尘数量
-  var SPARKS = 12      // 入场时头像四周迸出的星火数量
+  var PETALS = 10      // 上浮光点数量
+  var STARS = 16       // 星尘数量
+  var SPARKS = 8       // 入场时头像四周迸出的星火数量
 
   var HELLO = '欢迎回来'
   var TIP = '正在准备你的工作台'
@@ -71,10 +71,9 @@
     box.innerHTML =
       // 背景单独一层，且刻意不留富余：盒子就是视口，取景因此和主界面壁纸逐像素对齐
       '<div class="dshs-bg"><img src="/dsh-startup/bg" alt=""></div>' +
-      // 远景装饰：极光色块 + 旋转光束 + 星尘 + 上浮光点 + 掠过流星 + 斜向光带
+      // 远景装饰：极光色块 + 星尘 + 上浮光点 + 掠过流星 + 斜向光带
       '<div class="dshs-world">' +
-        '<div class="dshs-aurora"><i></i><i></i><i></i></div>' +
-        '<div class="dshs-rays"></div>' +
+        '<div class="dshs-aurora"><i></i><i></i></div>' +
         '<div class="dshs-stars"></div>' +
         '<div class="dshs-petals"></div>' +
         '<div class="dshs-streaks"><i></i><i></i></div>' +
