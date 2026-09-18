@@ -659,8 +659,13 @@ html.dshs-boot #root { opacity: 0; }
   #dshs .dshs-bar { width: clamp(120px, 30vmin, 190px); height: 4px; }
 }
 
+/* 系统开了「减少动态效果」时：
+   **关掉**的是一切"会一直动"和"跟着人动"的东西 —— 星尘/光点/流星、极光漂移、柔光呼吸、
+   加载环旋转、头像浮动、玻璃反光、指针视差与 3D 倾斜、背景推近；
+   **保留**的是一次性的入场：进入主界面那道光带、模块组装（行程由 boot.js 收到 35%）、启动页淡出。
+   理由是这条设置针对的是大位移、视差、持续旋转这类容易引发不适的动效，
+   而不是"入场不许有任何动画"——全砍掉的结果就是这台机器上什么都看不见。 */
 @media (prefers-reduced-motion: reduce) {
-  #dshs .dshs-bg,
   #dshs .dshs-aurora i,
   #dshs .dshs-star,
   #dshs .dshs-halo,
@@ -673,7 +678,9 @@ html.dshs-boot #root { opacity: 0; }
   #dshs.is-in .dshs-tip i,
   #dshs.is-in .dshs-bar::after,
   #dshs.is-in .dshs-orb { animation: none; }
-  #dshs.is-out .dshs-beam { animation: none; }
+  /* 背景不推近也不收束：静止在 1:1，收尾照样和主界面壁纸严丝合缝 */
+  #dshs .dshs-bg,
+  #dshs.is-in .dshs-bg { transform: scale(1); animation: none; }
   #dshs .dshs-cursor,
   #dshs .dshs-portrait { translate: none; transform: none; }
   #dshs .dshs-sheen,
@@ -684,14 +691,12 @@ html.dshs-boot #root { opacity: 0; }
   #dshs .dshs-halo,
   #dshs .dshs-stage { translate: none; }
   html.dshs-boot #root,
-  html.dshs-boot-out #root,
   #dshs.is-in .dshs-avatar,
   #dshs.is-in .dshs-hello span,
   #dshs.is-in .dshs-accent,
   #dshs.is-in .dshs-tip,
   #dshs.is-in .dshs-bar,
   #dshs.is-out,
-  #dshs.is-out .dshs-bg,
   #dshs.is-out .dshs-world,
   #dshs.is-out .dshs-handoff,
   #dshs.is-out .dshs-stage {
