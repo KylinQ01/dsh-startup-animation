@@ -38,6 +38,7 @@
 
   var startedAt = Date.now()
   var splash = null
+  var beam = null
   var bar = null
   var poll = 0
   var raf = 0
@@ -101,9 +102,7 @@
         '<div class="dshs-accent"></div>' +
         '<div class="dshs-tip">' + TIP + '<i>.</i><i>.</i><i>.</i></div>' +
         '<div class="dshs-bar"><span></span><i class="dshs-orb"></i><i class="dshs-orb"></i></div>' +
-      '</div>' +
-      // 压在最上层：进入主界面时横扫整屏的那道光束
-      '<div class="dshs-beam"></div>'
+      '</div>'
     scatterStars(box.querySelector('.dshs-stars'))
     scatterPetals(box.querySelector('.dshs-petals'))
     scatterSparks(box.querySelector('.dshs-sparks'))
@@ -251,22 +250,38 @@
     // 预览页会置上 __dshsNoRemember：在预览里放一遍不该让真实页面也跳过动画
     if (!window.__dshsNoRemember) { try { sessionStorage.setItem(SEEN_KEY, String(Date.now())) } catch (err) {} }
 
-    // 等淡出**真的**结束再摘节点。主界面这会儿正在首次渲染，主线程一忙，
-    // 走主线程的 opacity 过渡会比合成器上的位移晚开始；固定等 OUT_MS 就会把还没淡完的
-    // 启动页硬切掉 —— 那看起来就是"没有转场"。所以以 transitionend 为准，定时器只做兜底。
+    // 光束**单独挂在 body 上**，不放在启动页里面 —— 关键：启动页收尾会整层淡到 opacity 0
+    // （系统开了"减少动态效果"时只有 0.2s），放在里面的光带会被一起带走，820ms 的横扫根本播不完。
+    // 挂到 body 上、自己一层 z-index，它就能压在"正在进场的主界面"上面扫完全程。
+    beam = doc.createElement('div')
+    beam.className = 'dshs-beam'
+    doc.body.appendChild(beam)
+
+    // 两件事都完成才摘节点：启动页淡出（transitionend）+ 光束扫完（animationend）。
+    // 主界面这会儿正在首次渲染，主线程一忙，过渡会比合成器上的位移晚开始；
+    // 固定等 OUT_MS 就会把还没淡完的启动页硬切掉 —— 那看起来就是"没有转场"。定时器只做兜底。
+    var gates = 2
     var done = false
     function cleanup() {
       if (done) return
       done = true
+      // 顺序要紧：先摘光束再删样式表，否则光束会以无样式的大方块闪一下
+      if (beam && beam.parentNode) beam.parentNode.removeChild(beam)
+      beam = null
       html.classList.remove('dshs-boot-out')
       if (node.parentNode) node.parentNode.removeChild(node)
       var css = doc.getElementById('dshs-css')
       if (css && css.parentNode) css.parentNode.removeChild(css)
     }
+    function gate() {
+      if (--gates > 0) return
+      cleanup()
+    }
     node.addEventListener('transitionend', function (event) {
-      if (event.target === node && event.propertyName === 'opacity') cleanup()
+      if (event.target === node && event.propertyName === 'opacity') gate()
     })
-    setTimeout(cleanup, OUT_MS + 600)
+    beam.addEventListener('animationend', gate)
+    setTimeout(cleanup, OUT_MS + 900)
 
     assemble()
   }
