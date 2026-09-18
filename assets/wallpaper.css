@@ -1,0 +1,15 @@
+/* 主界面壁纸（图二）。和启动页同一张图——启动页淡出后背景只是"由虚转实"，过场因此接得上。
+   这份样式不参与启动页收尾清理，常驻整个页面生命周期。
+
+   做法只有两条：把外壳底色变量改透明、把侧栏底色变量改成半透白，壁纸画在 body 上。
+   面板、卡片、代码块、下拉菜单用的都是别的变量，一律保持不透明——文字永远落在 ≥78% 白底上，
+   所以壁纸再花也不会影响可读性。
+   深色主题不套用：浅色壁纸配浅色文字会糊成一片，切到深色就还是原来的深色界面。 */
+
+html body:not([data-ds-dark-theme]) {
+  --dsw-alias-bg-base: transparent;
+  --dsw-specific-sidebar-fill: rgba(255, 255, 255, .78);
+  background:
+    linear-gradient(rgba(253, 250, 254, .8), rgba(250, 247, 253, .68)),
+    url("/dsh-startup/bg") center / cover no-repeat fixed #f7f1f8;
+}

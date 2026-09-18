@@ -1,0 +1,6 @@
+# dsh-startup-animation —— DSH bundle patch
+#
+# 挂载声明：profile 把本包列进 dsh.profile.bundles 后，这行 insert 会把插件推进配置树。
+- insert:
+    - id: dsh-startup-animation
+      name: dsh-startup-animation

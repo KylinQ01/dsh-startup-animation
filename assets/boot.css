@@ -1,0 +1,550 @@
+/* DSH 启动动画样式。由 dsh-startup-animation 的宿主插件内联进 index.html 的 <head>。
+   规则全部挂在 #dshs / html.dshs-* 上，动画收尾时整段样式会被移除，不给主界面留残留。
+
+   画面分三层（都只跑 transform / translate / opacity，合成器友好，不触发重排）：
+     远景 .dshs-world   背景图推近 → 极光色块漂移 → 光束缓慢旋转 → 星尘闪烁 → 光点上浮 → 流星掠过 → 斜向光带
+     中景              提亮面纱 + 呼吸暗角
+     近景 .dshs-stage   头像（回弹入场 + 玻璃反光扫过 + 上下浮动）、逐字文案、渐变下划线、状态小字、进度条
+   入场按一条时间轴依次点亮，常驻的循环各自错开周期，避免整屏一起"呼吸"；
+   --dshs-px / --dshs-py 由 boot.js 跟随指针写入，各层按深度换算成位移，做出视差纵深。 */
+
+html.dshs-boot { background: #f7f1f8; }
+
+/* 启动页盖着的时候先把主界面藏起来；换成 .dshs-boot-out 后它按这条 transition 平滑入场。 */
+html.dshs-boot #root { opacity: 0; transform: scale(1.02); }
+html.dshs-boot #root,
+html.dshs-boot-out #root {
+  transform-origin: 50% 42%;
+  transition: opacity .68s ease, transform .68s cubic-bezier(.22, .61, .36, 1);
+}
+
+#dshs {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: hidden;
+  --dshs-px: 0;
+  --dshs-py: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 视差：用独立的 translate 属性写，和各自的 transform 动画互不覆盖；带一点滞后，看起来有重量。 */
+#dshs .dshs-world { translate: calc(var(--dshs-px) * -16px) calc(var(--dshs-py) * -12px); }
+#dshs .dshs-halo { translate: calc(var(--dshs-px) * 12px) calc(var(--dshs-py) * 9px); }
+#dshs .dshs-stage { translate: calc(var(--dshs-px) * 20px) calc(var(--dshs-py) * 14px); }
+#dshs .dshs-world,
+#dshs .dshs-halo,
+#dshs .dshs-stage { transition: translate .55s cubic-bezier(.22, .61, .36, 1); }
+
+/* ── 远景 ───────────────────────────────────────────────────────────── */
+
+/* 四周留富余：视差与推近都在这个盒子里移动，边不会露出来。 */
+#dshs .dshs-world { position: absolute; inset: -4%; }
+
+/* 几个只负责"装着随机元素"的层，本身不画东西。 */
+#dshs .dshs-stars,
+#dshs .dshs-petals,
+#dshs .dshs-streaks { position: absolute; inset: 0; }
+
+/* 背景图（图二）：缓慢推近；轻微虚化 + 提亮，让它退成背景，别和正中的头像抢视线。
+   亮度只提一点点：这张图本身多半就是浅色，提太多会把画面洗白。 */
+#dshs .dshs-bg {
+  position: absolute;
+  inset: -3%;
+  opacity: 0;
+  transform: scale(1.045);
+  filter: blur(6px) saturate(1.06) brightness(1.01);
+  transition: opacity .8s ease;
+  animation: dshs-drift 22s ease-out forwards;
+}
+#dshs .dshs-bg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#dshs.is-in .dshs-bg { opacity: 1; }
+@keyframes dshs-drift {
+  from { transform: scale(1.045); }
+  to { transform: scale(1); }
+}
+
+/* 极光：三团大范围柔光（纯径向渐变，不用 blur 滤镜），各自以不同周期漂移缩放。 */
+#dshs .dshs-aurora { position: absolute; inset: 0; }
+#dshs .dshs-aurora i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 1.3s ease .1s;
+}
+#dshs.is-in .dshs-aurora i { opacity: 1; }
+#dshs .dshs-aurora i:nth-child(1) {
+  left: -18%; top: -26%; width: 74vmax; height: 74vmax;
+  background: radial-gradient(circle, rgba(255, 190, 222, .5), rgba(255, 190, 222, 0) 64%);
+  animation: dshs-aura-a 26s ease-in-out infinite;
+}
+#dshs .dshs-aurora i:nth-child(2) {
+  right: -20%; top: -12%; width: 66vmax; height: 66vmax;
+  background: radial-gradient(circle, rgba(188, 176, 244, .45), rgba(188, 176, 244, 0) 64%);
+  animation: dshs-aura-b 33s ease-in-out infinite;
+}
+#dshs .dshs-aurora i:nth-child(3) {
+  left: 10%; bottom: -32%; width: 82vmax; height: 82vmax;
+  background: radial-gradient(circle, rgba(255, 236, 214, .42), rgba(255, 236, 214, 0) 66%);
+  animation: dshs-aura-c 40s ease-in-out infinite;
+}
+@keyframes dshs-aura-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6vmax, 3vmax, 0) scale(1.14); }
+}
+@keyframes dshs-aura-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.06); }
+  50% { transform: translate3d(-5vmax, 4vmax, 0) scale(0.94); }
+}
+@keyframes dshs-aura-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.96); }
+  50% { transform: translate3d(4vmax, -3vmax, 0) scale(1.1); }
+}
+
+/* 光束：一整圈放射状白光，靠径向遮罩只在中间一段显形，然后极慢地转。 */
+#dshs .dshs-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 132vmax;
+  height: 132vmax;
+  margin: -66vmax 0 0 -66vmax;
+  background: conic-gradient(from 0deg,
+    rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, .34) 4deg, rgba(255, 255, 255, 0) 11deg,
+    rgba(255, 255, 255, 0) 44deg, rgba(255, 255, 255, .26) 49deg, rgba(255, 255, 255, 0) 57deg,
+    rgba(255, 255, 255, 0) 96deg, rgba(255, 255, 255, .3) 101deg, rgba(255, 255, 255, 0) 110deg,
+    rgba(255, 255, 255, 0) 158deg, rgba(255, 255, 255, .22) 163deg, rgba(255, 255, 255, 0) 171deg,
+    rgba(255, 255, 255, 0) 214deg, rgba(255, 255, 255, .28) 219deg, rgba(255, 255, 255, 0) 228deg,
+    rgba(255, 255, 255, 0) 272deg, rgba(255, 255, 255, .24) 277deg, rgba(255, 255, 255, 0) 286deg,
+    rgba(255, 255, 255, 0) 328deg, rgba(255, 255, 255, .26) 333deg, rgba(255, 255, 255, 0) 342deg,
+    rgba(255, 255, 255, 0) 360deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 5%, rgba(0, 0, 0, .78) 26%, rgba(0, 0, 0, 0) 58%);
+  mask-image: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 5%, rgba(0, 0, 0, .78) 26%, rgba(0, 0, 0, 0) 58%);
+  opacity: 0;
+  transition: opacity 1.2s ease .3s;
+}
+#dshs.is-in .dshs-rays { opacity: .5; animation: dshs-spin 54s linear infinite; }
+@keyframes dshs-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 星尘：数量、位置、大小、亮度、周期都由 boot.js 随机给出，呼吸相位用负延迟错开。
+   浅色壁纸上纯白点看不见，所以做成"白芯 + 淡紫光晕"，在浅底上也能读出来。 */
+#dshs .dshs-star {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #fff 36%, rgba(206, 170, 232, .9) 68%, rgba(206, 170, 232, 0) 100%);
+  box-shadow: 0 0 6px rgba(186, 156, 224, .8), 0 0 14px rgba(255, 196, 224, .55);
+  opacity: 0;
+}
+#dshs.is-in .dshs-star { animation: dshs-twinkle 3s ease-in-out infinite both; }
+@keyframes dshs-twinkle {
+  0%, 100% { opacity: 0; transform: scale(.6); }
+  45% { opacity: var(--dshs-tw, .6); transform: scale(1); }
+}
+
+/* 上浮光点：位置/大小/时长/延迟各自随机，像缓慢飘起的花瓣。 */
+#dshs .dshs-petal {
+  position: absolute;
+  bottom: -6vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, .98), rgba(244, 164, 197, .85) 55%, rgba(176, 150, 228, 0) 100%);
+  box-shadow: 0 0 8px rgba(246, 184, 205, .6);
+  opacity: 0;
+  animation: dshs-float linear infinite;
+}
+@keyframes dshs-float {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.7); }
+  12% { opacity: .85; }
+  70% { opacity: .6; }
+  100% { opacity: 0; transform: translate3d(var(--dshs-sway, 2vmin), -112vh, 0) scale(1.1); }
+}
+
+/* 流星：两条细长光痕偶尔斜掠而过，一条早、一条晚，避免"整点报时"感。 */
+#dshs .dshs-streaks i {
+  position: absolute;
+  top: -12%;
+  left: -26%;
+  width: 1.5px;
+  height: 52vmax;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .85) 45%, rgba(255, 255, 255, 0));
+  opacity: 0;
+}
+#dshs.is-in .dshs-streaks i { animation: dshs-streak 13s cubic-bezier(.4, 0, .6, 1) infinite; }
+#dshs.is-in .dshs-streaks i:nth-child(2) {
+  left: 64%;
+  top: -30%;
+  height: 44vmax;
+  animation-duration: 17s;
+  animation-delay: 6.5s;
+}
+@keyframes dshs-streak {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(22deg); }
+  5% { opacity: .85; }
+  22% { opacity: 0; transform: translate3d(38vmax, 26vmax, 0) rotate(22deg); }
+  100% { opacity: 0; transform: translate3d(38vmax, 26vmax, 0) rotate(22deg); }
+}
+
+/* 斜向光带：入场时扫过一次，扫完就停在画面外。 */
+#dshs .dshs-sheen {
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0) 42%, rgba(255, 255, 255, .55) 50%, rgba(255, 255, 255, 0) 58%);
+  transform: translateX(-70%);
+  opacity: 0;
+}
+#dshs.is-in .dshs-sheen { animation: dshs-sheen 1.6s cubic-bezier(.3, .5, .3, 1) .12s 1 both; }
+@keyframes dshs-sheen {
+  0% { opacity: 0; transform: translateX(-70%); }
+  15% { opacity: .9; }
+  70% { opacity: .5; }
+  100% { opacity: 0; transform: translateX(70%); }
+}
+
+/* ── 中景 ───────────────────────────────────────────────────────────── */
+
+/* 让画面中心亮一点，头像和文字不被背景的笔画干扰（浅色图本身就很白，这里点到为止）。 */
+#dshs .dshs-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 50% at 50% 46%, rgba(255, 255, 255, .36), rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, .04) 45%, rgba(243, 236, 249, .34));
+}
+
+/* 暗角：四角轻轻压暗，并且缓慢呼吸，把视线收在正中。 */
+#dshs .dshs-vig {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 96% at 50% 46%, rgba(84, 58, 110, 0) 52%, rgba(84, 58, 110, .2) 100%);
+  opacity: 0;
+  transition: opacity 1.3s ease .3s;
+}
+#dshs.is-in .dshs-vig { opacity: 1; animation: dshs-vig 6.4s ease-in-out 1.2s infinite; }
+@keyframes dshs-vig {
+  0%, 100% { opacity: .72; }
+  50% { opacity: 1; }
+}
+
+/* 过场闪白：收尾时从中心 bloom 一下，接住主界面的淡入。 */
+#dshs .dshs-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(58% 48% at 50% 46%, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 72%);
+  opacity: 0;
+}
+#dshs.is-out .dshs-flash { animation: dshs-flash .62s ease-out both; }
+@keyframes dshs-flash {
+  0% { opacity: 0; }
+  26% { opacity: .78; }
+  100% { opacity: 0; }
+}
+
+/* ── 近景：舞台 ─────────────────────────────────────────────────────── */
+
+#dshs .dshs-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6vmin;
+}
+
+/* 头像与它周围的光晕/涟漪共用一个定位盒：光环永远跟着头像正中，不必猜百分比。 */
+#dshs .dshs-portrait { position: relative; display: grid; place-items: center; }
+
+/* 柔光：慢慢呼吸，给正中一点"活着"的感觉。 */
+#dshs .dshs-halo {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 64vmin;
+  height: 64vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, .58), rgba(246, 236, 252, .26) 42%, rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+  transition: opacity .9s ease .1s, translate .55s cubic-bezier(.22, .61, .36, 1);
+}
+#dshs.is-in .dshs-halo { opacity: 1; animation: dshs-breath 4.6s ease-in-out 1s infinite; }
+@keyframes dshs-breath {
+  0%, 100% { transform: scale(.92); }
+  50% { transform: scale(1.07); }
+}
+
+/* 一次性爆闪环：入场那一下从贴着头像弹出去，之后交给常驻涟漪。 */
+#dshs .dshs-burst {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: clamp(150px, 27vmin, 216px);
+  height: clamp(150px, 27vmin, 216px);
+  border-radius: 34%;
+  border: 2px solid rgba(255, 255, 255, .92);
+  box-shadow: 0 0 22px rgba(255, 255, 255, .55), inset 0 0 18px rgba(255, 255, 255, .35);
+  opacity: 0;
+}
+#dshs.is-in .dshs-burst { animation: dshs-burst 1.25s cubic-bezier(.16, .8, .3, 1) .16s 1 both; }
+@keyframes dshs-burst {
+  0% { opacity: 0; transform: scale(.88); }
+  14% { opacity: 1; }
+  100% { opacity: 0; transform: scale(2.1); }
+}
+
+/* 三圈涟漪：贴着头像扩到 1.85 倍再消失，彼此错开三分之一周期。 */
+#dshs .dshs-ping {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: clamp(150px, 27vmin, 216px);
+  height: clamp(150px, 27vmin, 216px);
+  border-radius: 34%;
+  border: 1.5px solid rgba(186, 166, 224, .5);
+  opacity: 0;
+}
+#dshs.is-in .dshs-ping { animation: dshs-ping 4.2s cubic-bezier(.2, .6, .35, 1) infinite; }
+#dshs.is-in .dshs-ping ~ .dshs-ping { animation-delay: 1.4s; }
+#dshs.is-in .dshs-ping ~ .dshs-ping ~ .dshs-ping { animation-delay: 2.8s; }
+@keyframes dshs-ping {
+  0% { opacity: 0; transform: scale(.95); }
+  16% { opacity: .7; }
+  100% { opacity: 0; transform: scale(1.85); }
+}
+
+/* 头像（图一）：留圆角方框而不是正圆，猫耳不会被裁掉；里面再扫一道玻璃反光。 */
+#dshs .dshs-avatar {
+  position: relative;
+  width: clamp(140px, 26vmin, 208px);
+  aspect-ratio: 1;
+  border-radius: 30%;
+  overflow: hidden;
+  background: #fff;
+  opacity: 0;
+  transform: translateY(16px) scale(.86);
+  box-shadow:
+    0 0 0 6px rgba(255, 255, 255, .92),
+    0 0 0 7px rgba(186, 166, 224, .45),
+    0 30px 70px -20px rgba(120, 90, 160, .55);
+}
+#dshs .dshs-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#dshs .dshs-shine {
+  position: absolute;
+  inset: -40% -70%;
+  background: linear-gradient(102deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, .85) 50%, rgba(255, 255, 255, 0) 60%);
+  opacity: 0;
+  transform: translateX(-130%);
+}
+#dshs.is-in .dshs-shine { animation: dshs-glass 5.6s ease-in-out .6s infinite; }
+@keyframes dshs-glass {
+  0% { opacity: 0; transform: translateX(-130%); }
+  4% { opacity: 1; }
+  22% { opacity: 0; transform: translateX(130%); }
+  100% { opacity: 0; transform: translateX(130%); }
+}
+/* 入场用带回弹的曲线；落位后交给轻微的上下浮动。 */
+#dshs.is-in .dshs-avatar {
+  opacity: 1;
+  transform: none;
+  transition: opacity .6s ease, transform .9s cubic-bezier(.16, 1.06, .3, 1.22);
+  animation: dshs-bob 5.4s ease-in-out 1.1s infinite;
+}
+@keyframes dshs-bob {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1.4%) scale(1.012); }
+}
+
+/* 逐字上浮：一个字一个 span，延迟按顺序错开。 */
+#dshs .dshs-hello {
+  font-size: clamp(24px, 3.6vmin, 34px);
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-indent: .18em;
+  color: #4f4260;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .95), 0 10px 26px rgba(255, 255, 255, .9);
+}
+#dshs .dshs-hello span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(14px) rotate(4deg);
+}
+#dshs.is-in .dshs-hello span {
+  opacity: 1;
+  transform: none;
+  transition: opacity .5s ease, transform .62s cubic-bezier(.22, .61, .36, 1);
+}
+#dshs.is-in .dshs-hello span:nth-child(1) { transition-delay: .2s; }
+#dshs.is-in .dshs-hello span:nth-child(2) { transition-delay: .28s; }
+#dshs.is-in .dshs-hello span:nth-child(3) { transition-delay: .36s; }
+#dshs.is-in .dshs-hello span:nth-child(4) { transition-delay: .44s; }
+
+/* 文案下方一条渐变细线，从中间展开。 */
+#dshs .dshs-accent {
+  width: clamp(64px, 10vmin, 104px);
+  height: 2px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(246, 184, 205, 0), #f6b8cd 22%, #b9a4e6 78%, rgba(185, 164, 230, 0));
+  box-shadow: 0 0 12px rgba(214, 180, 236, .75);
+  opacity: 0;
+  transform: scaleX(.15);
+}
+#dshs.is-in .dshs-accent {
+  opacity: .95;
+  transform: none;
+  transition: opacity .5s ease .46s, transform .9s cubic-bezier(.16, 1, .3, 1) .46s;
+}
+
+/* 状态小字：三个点依次点亮，表示"还在加载"。 */
+#dshs .dshs-tip {
+  font-size: clamp(11px, 1.5vmin, 13px);
+  letter-spacing: .22em;
+  text-indent: .22em;
+  color: rgba(92, 78, 112, .78);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .85);
+  opacity: 0;
+}
+#dshs.is-in .dshs-tip { opacity: 1; transition: opacity .6s ease .56s; }
+#dshs .dshs-tip i {
+  display: inline-block;
+  font-style: normal;
+  opacity: .25;
+  animation: dshs-blink 1.4s ease-in-out infinite;
+}
+#dshs .dshs-tip i:nth-of-type(2) { animation-delay: .2s; }
+#dshs .dshs-tip i:nth-of-type(3) { animation-delay: .4s; }
+@keyframes dshs-blink {
+  0%, 100% { opacity: .2; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-1px); }
+}
+
+/* 进度条：本体带内描边，进度用 scaleX 推进；上面再跑一道宽高光 + 两颗扫描光点。 */
+#dshs .dshs-bar {
+  position: relative;
+  width: clamp(160px, 22vmin, 240px);
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(122, 102, 152, .16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75);
+  overflow: hidden;
+  opacity: 0;
+}
+#dshs .dshs-bar span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, #f6b8cd, #b9a4e6);
+  box-shadow: 0 0 12px rgba(214, 180, 236, .85);
+  transition: transform .45s cubic-bezier(.3, .8, .4, 1);
+}
+#dshs .dshs-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 20%, rgba(255, 255, 255, .85) 50%, rgba(255, 255, 255, 0) 80%);
+  transform: translateX(-100%);
+  opacity: 0;
+}
+#dshs .dshs-orb {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle 4px at 2px 50%, rgba(255, 255, 255, .98), rgba(255, 255, 255, 0) 72%);
+  transform: translateX(-100%);
+  opacity: 0;
+}
+#dshs.is-in .dshs-bar { opacity: 1; transition: opacity .5s ease .34s; }
+#dshs.is-in .dshs-bar::after { animation: dshs-sweep 2.4s ease-in-out .7s infinite; }
+#dshs.is-in .dshs-orb { animation: dshs-scan 2.4s cubic-bezier(.42, 0, .58, 1) .7s infinite; }
+#dshs.is-in .dshs-orb + .dshs-orb { animation-delay: 1.9s; }
+@keyframes dshs-sweep {
+  0% { opacity: 0; transform: translateX(-100%); }
+  26% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+@keyframes dshs-scan {
+  0% { opacity: 0; transform: translateX(-100%); }
+  12% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+
+/* ── 过场 ───────────────────────────────────────────────────────────── */
+
+/* 舞台内容先走（放大 + 上浮），背景推远虚化，星尘/光束随之收掉，
+   同时中心 bloom 一下、主界面淡入归位（见文件开头）。 */
+#dshs.is-out {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .66s ease .04s;
+}
+#dshs.is-out .dshs-bg {
+  animation: none;
+  opacity: .9;
+  transform: scale(1.08);
+  filter: blur(16px) saturate(1.02) brightness(1.06);
+  transition: transform 1.1s cubic-bezier(.22, .61, .36, 1), filter 1.1s ease, opacity 1.1s ease;
+}
+#dshs.is-out .dshs-stage {
+  opacity: 0;
+  transform: scale(1.06) translateY(-12px);
+  transition: opacity .44s ease, transform .64s cubic-bezier(.22, .61, .36, 1);
+}
+#dshs.is-out .dshs-halo { opacity: 0; transition: opacity .5s ease; }
+#dshs.is-out .dshs-ping,
+#dshs.is-out .dshs-burst { opacity: 0; animation: none; transition: opacity .3s ease; }
+#dshs.is-out .dshs-petal { opacity: 0; transition: opacity .5s ease; }
+#dshs.is-out .dshs-rays { opacity: 0; transition: opacity .5s ease; }
+#dshs.is-out .dshs-aurora i { opacity: 0; transition: opacity .6s ease; }
+
+/* 矮窗口（小窗、以及设置页里嵌的预览框）里把舞台收一收，四行内容不至于挤在一起。 */
+@media (max-height: 560px) {
+  #dshs .dshs-stage { gap: 9px; padding: 3vmin; }
+  #dshs .dshs-avatar { width: clamp(92px, 24vmin, 148px); }
+  #dshs .dshs-hello { font-size: clamp(17px, 3.4vmin, 24px); letter-spacing: .14em; text-indent: .14em; }
+  #dshs .dshs-halo { width: 92vmin; height: 92vmin; }
+  #dshs .dshs-tip { font-size: 11px; letter-spacing: .16em; text-indent: .16em; }
+  #dshs .dshs-bar { width: clamp(120px, 30vmin, 190px); height: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dshs .dshs-bg,
+  #dshs .dshs-aurora i,
+  #dshs .dshs-rays,
+  #dshs .dshs-star,
+  #dshs .dshs-vig,
+  #dshs .dshs-halo,
+  #dshs.is-in .dshs-avatar,
+  #dshs.is-in .dshs-ping,
+  #dshs.is-in .dshs-burst,
+  #dshs.is-in .dshs-shine,
+  #dshs.is-in .dshs-tip i,
+  #dshs.is-in .dshs-bar::after,
+  #dshs.is-in .dshs-orb { animation: none; }
+  #dshs .dshs-sheen,
+  #dshs .dshs-petal,
+  #dshs .dshs-star,
+  #dshs .dshs-streaks { display: none; }
+  #dshs .dshs-world,
+  #dshs .dshs-halo,
+  #dshs .dshs-stage { translate: none; }
+  html.dshs-boot #root,
+  html.dshs-boot-out #root,
+  #dshs.is-in .dshs-avatar,
+  #dshs.is-in .dshs-hello span,
+  #dshs.is-in .dshs-accent,
+  #dshs.is-in .dshs-tip,
+  #dshs.is-in .dshs-bar,
+  #dshs.is-out,
+  #dshs.is-out .dshs-bg,
+  #dshs.is-out .dshs-stage {
+    transition-duration: .2s;
+    transition-delay: 0s;
+  }
+}
