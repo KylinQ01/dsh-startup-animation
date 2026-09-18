@@ -46,7 +46,11 @@
 
 ## 🚀 安装
 
-先把依赖写进 profile 的 `package.json`（`link:` 指向你 clone 下来的目录）：
+```powershell
+git clone https://github.com/KylinQ01/dsh-startup-animation.git
+```
+
+然后把依赖写进 profile 的 `package.json`（`link:` 指向刚 clone 下来的目录）：
 
 ```jsonc
 // ~/.dsh/profiles/<profile>/package.json
