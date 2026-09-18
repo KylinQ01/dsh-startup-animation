@@ -264,5 +264,99 @@
       if (event.target === node && event.propertyName === 'opacity') cleanup()
     })
     setTimeout(cleanup, OUT_MS + 600)
+
+    assemble()
+  }
+
+  /**
+   * 主界面「模块组装」：挑出 #root 里的几个大块（最多 6 个），让它们各自从自己那一侧
+   * 滑到位并轻微放大落锁，按顺序错峰进场 —— 看起来就是各个模块一块块拼上去。
+   *
+   * 挑块靠**几何尺寸**而不是类名：DSH 前端改结构、换 CSS 命名都不会让这段失效。
+   * 只做 transform（不逐个改 opacity）：一块一块做 group opacity 在低配机上太贵，
+   * 整体"浮现"交给 #root 那一次淡入。
+   * 动画跑完立刻摘掉内联样式，不给主界面留 transform / 自定义属性。
+   */
+  var ASSEMBLE_MS = 620
+  var ASSEMBLE_STEP = 80
+  var ASSEMBLE_DELAY = 190   // 等启动页淡掉大半再开始拼，不然组装被那层白纱盖住了
+
+  function assemble() {
+    if (calm) return
+    var root = doc.getElementById('root')
+    if (!root) return
+    var vw = window.innerWidth || 1
+    var vh = window.innerHeight || 1
+
+    function big(child) {
+      var rect = child.getBoundingClientRect()
+      return rect.width >= vw * 0.1 && rect.height >= vh * 0.15 ? rect : null
+    }
+    // 子模块常常是"又宽又扁"的一条（工具条、输入区），所以判定放宽在高度上
+    function medium(child) {
+      var rect = child.getBoundingClientRect()
+      return rect.width >= vw * 0.2 && rect.height >= vh * 0.05 ? rect : null
+    }
+    // 找"第一层就有 ≥2 个够大的孩子"的那一层：只有 1 个大孩子说明还套着外壳，再往里走一层。
+    // 这样拿到的是并列的模块（侧栏 / 主区 / 面板），而不是那个包住一切的外壳。
+    function collect(node, depth) {
+      var kids = node.children
+      var found = []
+      for (var i = 0; i < kids.length; i++) {
+        var rect = big(kids[i])
+        if (rect) found.push({ el: kids[i], rect: rect })
+      }
+      if (found.length >= 2 || depth >= 3) return found.slice(0, 6)
+      for (var j = 0; j < kids.length; j++) {
+        var deeper = collect(kids[j], depth + 1)
+        if (deeper.length >= 2) return deeper.slice(0, 6)
+      }
+      return found.slice(0, 6)
+    }
+
+    var picks = collect(root, 0)
+    if (picks.length === 0) return
+
+    // 再往里挑最多两块"子模块"（最大那块里面够大的孩子），让它们晚一拍落锁。
+    // 父子同时动 = 位移叠加，正好做出"大框架先到位、小面板再咔一下嵌进去"的层次。
+    if (picks.length < 6) {
+      var host = picks[0]
+      for (var p = 1; p < picks.length; p++) {
+        if (picks[p].rect.width * picks[p].rect.height > host.rect.width * host.rect.height) host = picks[p]
+      }
+      var subs = []
+      for (var c = 0; c < host.el.children.length && subs.length < 2 && picks.length + subs.length < 6; c++) {
+        var subRect = medium(host.el.children[c])
+        if (subRect) subs.push({ el: host.el.children[c], rect: subRect, sub: true })
+      }
+      picks = picks.concat(subs)
+    }
+
+    picks.forEach(function (pick, index) {
+      var cx = pick.rect.left + pick.rect.width / 2
+      var cy = pick.rect.top + pick.rect.height / 2
+      // 从"它自己在画面的哪一侧"反向推入场起点：左边的从左来，上边的从上来。
+      // 子模块的行程打对折，免得叠在父模块的位移上飞太远。
+      var scale = pick.sub ? 0.45 : 1
+      var ax = ((cx - vw / 2) / (vw / 2) * 64 * scale).toFixed(1)
+      var ay = ((cy - vh / 2) / (vh / 2) * 40 * scale + 26 * scale).toFixed(1)
+      pick.el.style.setProperty('--dshs-ax', ax + 'px')
+      pick.el.style.setProperty('--dshs-ay', ay + 'px')
+      pick.el.style.animation = 'dshs-assemble ' + (ASSEMBLE_MS / 1000) + 's cubic-bezier(.2, .9, .26, 1) '
+        + (ASSEMBLE_DELAY + index * ASSEMBLE_STEP) + 'ms both'
+    })
+
+    var swept = false
+    function sweep() {
+      if (swept) return
+      swept = true
+      picks.forEach(function (pick) {
+        pick.el.style.animation = ''
+        pick.el.style.removeProperty('--dshs-ax')
+        pick.el.style.removeProperty('--dshs-ay')
+      })
+    }
+    picks[picks.length - 1].el.addEventListener('animationend', sweep)
+    setTimeout(sweep, ASSEMBLE_DELAY + ASSEMBLE_MS + picks.length * ASSEMBLE_STEP + 300)
   }
 })()

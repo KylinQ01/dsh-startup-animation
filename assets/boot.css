@@ -10,15 +10,20 @@
 
 html.dshs-boot { background: #f7f1f8; }
 
-/* 启动页盖着的时候先把主界面藏起来；换成 .dshs-boot-out 后它从"略低一点"的位置
-   归位并淡入，和背景的收束同拍（都是 700ms）：背景往回收、内容往上落，
-   这一下才看得出是一个转场，而不是一次硬切。
-   只做 translateY、不做 scale：主界面是整棵子树，缩放它等于每帧重栅格化整个界面。 */
-html.dshs-boot #root { opacity: 0; transform: translateY(10px); }
-html.dshs-boot #root,
-html.dshs-boot-out #root {
-  transform-origin: 50% 42%;
-  transition: opacity .7s cubic-bezier(.4, 0, .2, 1), transform .7s cubic-bezier(.4, 0, .2, 1);
+/* 启动页盖着的时候先把主界面藏起来（opacity:0 的层浏览器会跳过绘制，省一笔）。
+   收尾时不整体淡入 —— 浮现交给下面 dshs-assemble：一块一块冒出来，"组装"才看得出来。
+   总像素量和"整体淡入一次"差不多，只是拆到了几个模块上。 */
+html.dshs-boot #root { opacity: 0; }
+
+/* 主界面「模块组装」：boot.js 在收尾时挑出 #root 里几个模块，挂上这条动画；
+   入场方向由 --dshs-ax / --dshs-ay 从元素自己的位置反推（左边的模块从左来、上边的从上来），
+   错峰延迟由 JS 写进 animation-delay。 */
+@keyframes dshs-assemble {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--dshs-ax, 0px), var(--dshs-ay, 26px), 0) scale(.955);
+  }
+  to { opacity: 1; transform: none; }
 }
 
 #dshs {

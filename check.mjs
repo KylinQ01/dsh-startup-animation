@@ -107,6 +107,11 @@ assert.ok(/\.dshs-bg\s*\{[^}]*inset:\s*0;/.test(splashCss), '启动页背景层�
 // 视差一半在 JS（写变量）一半在 CSS（消费变量），两边都得在
 assert.ok(js.includes('--dshs-px') && js.includes('--dshs-py'), 'boot.js 要把指针位置写进视差变量')
 assert.ok(splashCss.includes('--dshs-px') && splashCss.includes('--dshs-py'), 'boot.css 要消费视差变量')
+// 主界面「模块组装」同理：JS 挂动画名 + 写起点变量，CSS 定义关键帧，缺一个都静默失效
+assert.ok(js.includes('dshs-assemble'), 'boot.js 要在收尾时挂上模块组装动画')
+assert.ok(splashCss.includes('@keyframes dshs-assemble'), 'boot.css 要有 dshs-assemble 关键帧')
+assert.ok(splashCss.includes('--dshs-ax') && splashCss.includes('--dshs-ay'), '关键帧要消费组装起点变量')
+assert.ok(js.includes("'--dshs-ax'") && js.includes("'--dshs-ay'"), 'boot.js 要写入组装起点变量')
 
 // 4) 图片槽位：上传 → 生效 → 恢复默认，全程只碰临时目录
 const png = Buffer.concat([
