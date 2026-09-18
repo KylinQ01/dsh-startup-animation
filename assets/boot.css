@@ -216,6 +216,24 @@ html.dshs-boot-out #root {
     linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, .04) 45%, rgba(243, 236, 249, .34));
 }
 
+/* 跟着指针走的暖光：整块画面像有一盏灯跟着你，和视差叠加后纵深更明显。
+   用 50vw/50vh 换算，光心就落在指针上；偏暖粉而不是纯白，免得把背景洗白。
+   只在真的动过指针之后才亮（is-aim）——否则它一开始就杵在正中间，会把画面照白。 */
+#dshs .dshs-cursor {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70vmax;
+  height: 70vmax;
+  margin: -35vmax 0 0 -35vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 216, 238, .28), rgba(255, 216, 238, .09) 42%, rgba(255, 216, 238, 0) 70%);
+  opacity: 0;
+  translate: calc(var(--dshs-px) * 50vw) calc(var(--dshs-py) * 50vh);
+  transition: opacity 1.1s ease .35s, translate .5s cubic-bezier(.22, .61, .36, 1);
+}
+#dshs.is-in.is-aim .dshs-cursor { opacity: 1; }
+
 /* 暗角：四角轻轻压暗，并且缓慢呼吸，把视线收在正中。 */
 #dshs .dshs-vig {
   position: absolute;
@@ -257,8 +275,15 @@ html.dshs-boot-out #root {
   padding: 6vmin;
 }
 
-/* 头像与它周围的光晕/涟漪共用一个定位盒：光环永远跟着头像正中，不必猜百分比。 */
-#dshs .dshs-portrait { position: relative; display: grid; place-items: center; }
+/* 头像与它周围的光晕/加载环/涟漪共用一个定位盒：光环永远跟着头像正中，不必猜百分比。
+   指针一动，整个"头像框"跟着轻微 3D 倾斜（角度来自 --dshs-px/--dshs-py），有实体感。 */
+#dshs .dshs-portrait {
+  position: relative;
+  display: grid;
+  place-items: center;
+  transform: perspective(900px) rotateY(calc(var(--dshs-px) * 6deg)) rotateX(calc(var(--dshs-py) * -5deg));
+  transition: transform .5s cubic-bezier(.22, .61, .36, 1);
+}
 
 /* 柔光：慢慢呼吸，给正中一点"活着"的感觉。 */
 #dshs .dshs-halo {
@@ -276,6 +301,41 @@ html.dshs-boot-out #root {
 @keyframes dshs-breath {
   0%, 100% { transform: scale(.92); }
   50% { transform: scale(1.07); }
+}
+
+/* 两圈转动的加载环：一顺一逆、一大一小，比单调的进度条更像"在转"，也更可爱。 */
+#dshs .dshs-orbit {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: clamp(164px, 30vmin, 238px);
+  height: clamp(164px, 30vmin, 238px);
+  border-radius: 50%;
+  border: 2px solid rgba(186, 166, 224, .16);
+  border-top-color: rgba(255, 255, 255, .95);
+  border-right-color: rgba(206, 170, 232, .8);
+  box-shadow: 0 0 10px rgba(206, 170, 232, .3);
+  opacity: 0;
+  transition: opacity .8s ease .35s;
+}
+#dshs.is-in .dshs-orbit { opacity: .9; animation: dshs-orbit 7s linear infinite; }
+#dshs.is-in .dshs-orbit + .dshs-orbit {
+  width: clamp(192px, 35vmin, 278px);
+  height: clamp(192px, 35vmin, 278px);
+  border-color: rgba(186, 166, 224, .12);
+  border-top-color: transparent;
+  border-bottom-color: rgba(246, 184, 205, .6);
+  box-shadow: none;
+  opacity: .6;
+  animation: dshs-orbit-rev 11s linear infinite;
+}
+@keyframes dshs-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes dshs-orbit-rev {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
 }
 
 /* 一次性爆闪环：入场那一下从贴着头像弹出去，之后交给常驻涟漪。 */
@@ -309,8 +369,25 @@ html.dshs-boot-out #root {
   opacity: 0;
 }
 #dshs.is-in .dshs-ping { animation: dshs-ping 4.2s cubic-bezier(.2, .6, .35, 1) infinite; }
-#dshs.is-in .dshs-ping ~ .dshs-ping { animation-delay: 1.4s; }
-#dshs.is-in .dshs-ping ~ .dshs-ping ~ .dshs-ping { animation-delay: 2.8s; }
+#dshs.is-in .dshs-ping ~ .dshs-ping { animation-delay: 2.1s; }
+
+/* 星火：入场那一下从头像四周迸出去，只跑一次，飞完就消失（位置/半径/延迟由 boot.js 随机）。 */
+#dshs .dshs-sparks { position: absolute; inset: 0; }
+#dshs .dshs-spark {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #fff 40%, rgba(214, 180, 236, 0) 100%);
+  box-shadow: 0 0 8px rgba(186, 156, 224, .9), 0 0 14px rgba(255, 196, 224, .6);
+  opacity: 0;
+}
+#dshs.is-in .dshs-spark { animation: dshs-spark 1.15s cubic-bezier(.2, .7, .3, 1) var(--dshs-sd, .3s) 1 both; }
+@keyframes dshs-spark {
+  0% { opacity: 0; transform: rotate(var(--dshs-sa, 0deg)) translateY(-10px) scale(.35); }
+  16% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--dshs-sa, 0deg)) translateY(calc(-1 * var(--dshs-sr, 80px))) scale(1); }
+}
 @keyframes dshs-ping {
   0% { opacity: 0; transform: scale(.95); }
   16% { opacity: .7; }
@@ -333,6 +410,12 @@ html.dshs-boot-out #root {
     0 30px 70px -20px rgba(120, 90, 160, .55);
 }
 #dshs .dshs-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 头像自己极慢地"推近"，静止的画面里也有呼吸感。 */
+#dshs.is-in .dshs-avatar img { animation: dshs-portrait-zoom 7s ease-out .1s both; }
+@keyframes dshs-portrait-zoom {
+  from { transform: scale(1.09); }
+  to { transform: scale(1); }
+}
 #dshs .dshs-shine {
   position: absolute;
   inset: -40% -70%;
@@ -497,6 +580,9 @@ html.dshs-boot-out #root {
   transition: opacity .44s ease, transform .64s cubic-bezier(.22, .61, .36, 1);
 }
 #dshs.is-out .dshs-halo { opacity: 0; transition: opacity .5s ease; }
+#dshs.is-out .dshs-orbit { opacity: 0; transition: opacity .4s ease; }
+#dshs.is-out .dshs-cursor { opacity: 0; transition: opacity .4s ease; }
+#dshs.is-out .dshs-spark { opacity: 0; animation: none; }
 #dshs.is-out .dshs-ping,
 #dshs.is-out .dshs-burst { opacity: 0; animation: none; transition: opacity .3s ease; }
 #dshs.is-out .dshs-petal { opacity: 0; transition: opacity .5s ease; }
@@ -524,9 +610,14 @@ html.dshs-boot-out #root {
   #dshs.is-in .dshs-ping,
   #dshs.is-in .dshs-burst,
   #dshs.is-in .dshs-shine,
+  #dshs.is-in .dshs-orbit,
+  #dshs.is-in .dshs-spark,
+  #dshs.is-in .dshs-avatar img,
   #dshs.is-in .dshs-tip i,
   #dshs.is-in .dshs-bar::after,
   #dshs.is-in .dshs-orb { animation: none; }
+  #dshs .dshs-cursor,
+  #dshs .dshs-portrait { translate: none; transform: none; }
   #dshs .dshs-sheen,
   #dshs .dshs-petal,
   #dshs .dshs-star,

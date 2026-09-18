@@ -20,9 +20,9 @@
 | --- | --- |
 | `0.0s` | 主界面被 `<head>` 里的早脚本提前藏好，**不会先闪一下白底主界面** |
 | `~0.1s` | 背景图缓缓推近 · 三团极光来回漂 · 一束放射光慢慢转 · 星尘一闪一闪 · 光点往上飘 · 流星偶尔掠过 |
-| `~0.2s` | 头像「啵」地弹进来，套一圈爆闪环 + 三圈涟漪，还有一道玻璃反光扫过 |
+| `~0.2s` | 头像「啵」地弹进来，套一圈爆闪环 + 四周迸出星火 + 两圈涟漪，还有一道玻璃反光扫过 |
 | `~0.3s` | 「**欢迎回来**」一个字一个字浮上来，下面一条渐变细线展开 |
-| 全程 | 鼠标一动，整屏按远近**分层视差**跟着晃，有纵深 🐾 |
+| 全程 | 两圈加载环一顺一逆慢慢转 · 头像自己极慢地推近 · 鼠标一动整屏按远近**分层视差**跟着晃、头像跟着轻轻 3D 倾斜，还有一盏暖光跟着指针走 🐾 |
 | 加载好了 | 中心 bloom 一下 → 启动页淡出、背景推远虚化 → 主界面 680ms 淡入归位 |
 | 进去之后 | 主界面壁纸**就是同一张背景图**，所以过场看起来像"背景由虚转实"，接得很顺 🍃 |
 
@@ -80,12 +80,15 @@ dsh --profile desktop --dump-config | Select-String startup-animation   # 看到
 
 | 想改 | 改哪里 |
 | --- | --- |
-| 节奏：最短/兜底时长、就绪判定、过场时长、星尘光点数量 | `assets/boot.js` 顶部那几个常量 |
+| 节奏：最短/兜底时长、就绪判定、过场时长、星尘光点数量 | `assets/boot.js` 顶部那几个常量（`SPARKS` 是入场星火数） |
 | 头像大小圆角、文字、进度条 | `assets/boot.css` 的 `.dshs-avatar` / `.dshs-hello` / `.dshs-bar` |
 | 背景虚化程度、推近速度 | `.dshs-bg` 的 `filter` 和 `dshs-drift` |
 | **极光颜色与浓淡** | `.dshs-aurora i:nth-child(1~3)` 的三组 `radial-gradient` |
 | 星尘 / 光点 / 流星 | `.dshs-star` / `.dshs-petal` / `.dshs-streaks` |
 | 光束转速与明暗 | `.dshs-rays` 的 `conic-gradient` 和 `dshs-spin` |
+| **两圈加载环** | `.dshs-orbit`（大小、粗细、转速、颜色都在这里；第二圈是 `.dshs-orbit + .dshs-orbit`） |
+| **跟随指针的暖光** | `.dshs-cursor` 的 `radial-gradient` 与 `translate` 里的 `50vw/50vh` |
+| **头像 3D 倾斜幅度** | `.dshs-portrait` 的 `rotateY/rotateX` 里那两个 `6deg/5deg` |
 | **鼠标视差幅度** | `boot.css` 顶部三条 `translate: calc(var(--dshs-px) * Npx)`，改那个 N 就是改纵深 |
 | 主界面壁纸浓淡 / 侧栏透明度 | `assets/wallpaper.css`（两个白色透明度越大越淡；侧栏看 `--dsw-specific-sidebar-fill`） |
 

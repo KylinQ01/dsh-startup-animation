@@ -90,7 +90,7 @@ const classes = new Set(
 for (const name of classes) {
   assert.ok(splashCss.includes('.' + name), `boot.css 里缺少 .${name}，但 boot.js 会用到它`)
 }
-for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-rays', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb']) {
+for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-rays', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark']) {
   assert.ok(splashCss.includes('.' + layer), `boot.css 里缺少 .${layer}，这一层画面不该被删掉`)
 }
 // 视差一半在 JS（写变量）一半在 CSS（消费变量），两边都得在

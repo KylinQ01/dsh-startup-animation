@@ -27,6 +27,7 @@
   var OUT_MS = 700     // 过场时长，与 boot.css 的 .is-out 保持一致
   var PETALS = 16      // 上浮光点数量
   var STARS = 30       // 星尘数量
+  var SPARKS = 12      // 入场时头像四周迸出的星火数量
 
   var HELLO = '欢迎回来'
   var TIP = '正在准备你的工作台'
@@ -66,7 +67,7 @@
     var hello = ''
     for (var i = 0; i < HELLO.length; i++) hello += '<span>' + HELLO.charAt(i) + '</span>'
     var pings = ''
-    for (var p = 0; p < 3; p++) pings += '<div class="dshs-ping"></div>'
+    for (var p = 0; p < 2; p++) pings += '<div class="dshs-ping"></div>'
     box.innerHTML =
       // 远景：背景图 + 极光色块 + 旋转光束 + 星尘 + 上浮光点 + 掠过流星 + 斜向光带
       '<div class="dshs-world">' +
@@ -78,16 +79,20 @@
         '<div class="dshs-streaks"><i></i><i></i></div>' +
         '<div class="dshs-sheen"></div>' +
       '</div>' +
-      // 中景：提亮面纱 + 呼吸暗角
+      // 中景：提亮面纱 + 跟随指针的暖光 + 呼吸暗角
       '<div class="dshs-veil"></div>' +
+      '<div class="dshs-cursor"></div>' +
       '<div class="dshs-vig"></div>' +
-      // 近景：头像 + 柔光 + 一次性爆闪 + 三圈涟漪 + 过场闪白
+      // 近景：头像 + 柔光 + 两圈转动的加载环 + 一次性爆闪 + 两圈涟漪 + 迸出的星火 + 过场闪白
       '<div class="dshs-flash"></div>' +
       '<div class="dshs-stage">' +
         '<div class="dshs-portrait">' +
           '<div class="dshs-halo"></div>' +
+          '<div class="dshs-orbit"></div>' +
+          '<div class="dshs-orbit"></div>' +
           '<div class="dshs-burst"></div>' +
           pings +
+          '<div class="dshs-sparks"></div>' +
           '<div class="dshs-avatar"><img src="/dsh-startup/avatar" alt=""><span class="dshs-shine"></span></div>' +
         '</div>' +
         '<div class="dshs-hello">' + hello + '</div>' +
@@ -97,6 +102,7 @@
       '</div>'
     scatterStars(box.querySelector('.dshs-stars'))
     scatterPetals(box.querySelector('.dshs-petals'))
+    scatterSparks(box.querySelector('.dshs-sparks'))
     return box
   }
 
@@ -116,6 +122,26 @@
         'animation-duration:' + (2.4 + Math.random() * 3.6).toFixed(1) + 's;' +
         'animation-delay:' + (-Math.random() * 6).toFixed(1) + 's;'
       host.appendChild(star)
+    }
+  }
+
+  /**
+   * 星火：入场那一下从头像四周迸出去。角度按数量均分再抖动一点，
+   * 半径/延迟/大小随机，所以每次开软件的形状都不一样。
+   */
+  function scatterSparks(host) {
+    if (calm) return
+    for (var i = 0; i < SPARKS; i++) {
+      var size = 3 + Math.random() * 3
+      var spark = doc.createElement('i')
+      spark.className = 'dshs-spark'
+      spark.style.cssText =
+        'width:' + size.toFixed(1) + 'px;' +
+        'height:' + size.toFixed(1) + 'px;' +
+        '--dshs-sa:' + (i * (360 / SPARKS) + Math.random() * 18 - 9).toFixed(1) + 'deg;' +
+        '--dshs-sr:' + (58 + Math.random() * 46).toFixed(0) + 'px;' +
+        '--dshs-sd:' + (0.22 + Math.random() * 0.28).toFixed(2) + 's;'
+      host.appendChild(spark)
     }
   }
 
@@ -148,6 +174,8 @@
       var h = window.innerHeight || 1
       px = (event.clientX / w) * 2 - 1
       py = (event.clientY / h) * 2 - 1
+      // 动过指针才点亮跟随暖光：没动过时它会在正中照出一团白，反而糊了背景
+      if (splash) splash.classList.add('is-aim')
       if (raf || !splash) return
       raf = window.requestAnimationFrame(paint)
     }, { passive: true })
