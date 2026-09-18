@@ -10,14 +10,14 @@
 
 html.dshs-boot { background: #f7f1f8; }
 
-/* 启动页盖着的时候先把主界面藏起来；换成 .dshs-boot-out 后它按这条 transition 平滑入场。
-   延时 .34s 是刻意的：前 340ms 启动页还完全不透明（在"对焦"），主界面这会浮上来也看不见，
-   所以让它的淡入和启动页的淡出对齐在同一个窗口里。 */
-html.dshs-boot #root { opacity: 0; transform: scale(1.02); }
+/* 启动页盖着的时候先把主界面藏起来；换成 .dshs-boot-out 后它从"稍大一点、略低一点"
+   归位并淡入，和背景的收束同拍（都是 700ms）：背景往回收、内容往上落，
+   这一下才看得出是一个转场，而不是一次硬切。 */
+html.dshs-boot #root { opacity: 0; transform: scale(1.035) translateY(10px); }
 html.dshs-boot #root,
 html.dshs-boot-out #root {
   transform-origin: 50% 42%;
-  transition: opacity .36s ease .34s, transform .36s cubic-bezier(.22, .61, .36, 1) .34s;
+  transition: opacity .7s cubic-bezier(.4, 0, .2, 1), transform .7s cubic-bezier(.4, 0, .2, 1);
 }
 
 #dshs {
@@ -52,22 +52,24 @@ html.dshs-boot-out #root {
 /* 背景图（图二）：**盒子就是视口，故意不留富余**——这样 `object-fit: cover` 的取景和
    主界面壁纸（body 上的 `center / cover fixed`）逐像素一致，收尾时两张图才能严丝合缝地接上。
    （以前这里套了两层 inset 富余，等于放大了约 14%，于是交接那一下会"跳"。）
-   推近与视差都走 transform / translate，收尾时回到 scale(1) + 无位移。 */
+
+   推近用**慢 transition** 而不是 CSS animation：animation 一旦被撤掉，属性会瞬间跳到目标值，
+   收尾那段"往回 settle"就完全看不见了；transition 会从当前插值接着往下走。
+   于是整条时间线是：1.075（入场）→ 26s 缓慢收到 1.05 → 收尾 700ms 收住到 1.0（= 壁纸）。 */
 #dshs .dshs-bg {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: scale(1.045);
+  transform: scale(1.075);
   filter: blur(6px) saturate(1.06) brightness(1.01);
   translate: calc(var(--dshs-px) * -10px) calc(var(--dshs-py) * -8px);
   transition: opacity .8s ease, translate .55s cubic-bezier(.22, .61, .36, 1);
-  animation: dshs-drift 22s ease-out forwards;
 }
 #dshs .dshs-bg img { width: 100%; height: 100%; object-fit: cover; display: block; }
-#dshs.is-in .dshs-bg { opacity: 1; }
-@keyframes dshs-drift {
-  from { transform: scale(1.045); }
-  to { transform: scale(1); }
+#dshs.is-in .dshs-bg {
+  opacity: 1;
+  transform: scale(1.05);
+  transition: opacity .8s ease, translate .55s cubic-bezier(.22, .61, .36, 1), transform 26s ease-out;
 }
 
 /* 极光：三团大范围柔光（纯径向渐变，不用 blur 滤镜），各自以不同周期漂移缩放。 */
@@ -571,31 +573,33 @@ html.dshs-boot-out #root {
 
 /* ── 过场 ───────────────────────────────────────────────────────────── */
 
-/* 过场分两拍，合起来 = OUT_MS(700ms)，和 boot.js 里那个常量成对：
-   ① 0–340ms「对焦」：舞台先撤，装饰层（极光/光束/星尘/光点/流星/面纱/暖光/暗角/光环/涟漪）
-      统统淡出，背景图同时去虚化、缩回 1、视差归零，并补上壁纸那层白纱。
-      到 340ms 时，启动页的背景与主界面壁纸已经逐像素一致。
-   ② 340–700ms「交接」：整层淡出。因为两边的背景一模一样，看起来只是主界面的内容浮上来，
-      而不是"一张模糊图化成了另一张清晰的图"。 */
+/* 过场是一条 700ms 的时间轴（= boot.js 的 OUT_MS），三件事同时进行、同时收尾：
+     · 背景从 1.075 一路收到 1:1 并拉掉虚化 —— 这是"看得见"的那一下（镜头收住）；
+     · 舞台（头像/文案/进度条）前 300ms 先撤；
+     · 整层淡出 + 主界面从 1.035 归位淡入（见文件开头）。
+   背景收束用的是 transition 而不是 animation：animation 被撤掉会瞬间跳到目标值，
+   那一下动感就没了；transition 会从当前插值接着走。
+   收尾终点与主界面壁纸逐像素重合，所以最后摘掉启动页节点时不会跳。
+   刻意不加 transition-delay、也不加 will-change：延迟会让过渡在部分环境下停在 pending，
+   而 will-change: opacity 作用在这么大的合成层上只会更慢。 */
 #dshs.is-out {
   pointer-events: none;
   opacity: 0;
-  transition: opacity .36s ease .34s;
+  transition: opacity .7s cubic-bezier(.4, 0, .2, 1);
 }
 #dshs.is-out .dshs-bg {
-  animation: none;
   opacity: 1;
   transform: scale(1);
   filter: blur(0) saturate(1) brightness(1);
   translate: none;
-  transition: transform .34s cubic-bezier(.22, .61, .36, 1), filter .34s ease, translate .34s cubic-bezier(.22, .61, .36, 1);
+  transition: transform .7s cubic-bezier(.4, 0, .2, 1), filter .45s ease, translate .6s cubic-bezier(.4, 0, .2, 1);
 }
-#dshs.is-out .dshs-handoff { opacity: 1; transition: opacity .34s ease; }
-#dshs.is-out .dshs-world { translate: none; transition: translate .34s cubic-bezier(.22, .61, .36, 1); }
+#dshs.is-out .dshs-handoff { opacity: 1; transition: opacity .5s ease; }
+#dshs.is-out .dshs-world { translate: none; transition: translate .6s cubic-bezier(.4, 0, .2, 1); }
 #dshs.is-out .dshs-stage {
   opacity: 0;
   transform: scale(1.05) translateY(-10px);
-  transition: opacity .3s ease, transform .34s cubic-bezier(.22, .61, .36, 1);
+  transition: opacity .3s ease, transform .4s cubic-bezier(.4, 0, .2, 1);
 }
 #dshs.is-out .dshs-veil,
 #dshs.is-out .dshs-cursor,
@@ -615,10 +619,11 @@ html.dshs-boot-out #root {
   transition: opacity .3s ease;
 }
 #dshs.is-out .dshs-spark { opacity: 0; animation: none; }
-#dshs.is-out .dshs-flash { animation: dshs-flash .34s ease-out both; }
+/* 收住那一下轻轻 bloom 一下；.38s 内结束，不参与第二拍的淡出。 */
+#dshs.is-out .dshs-flash { animation: dshs-flash .38s ease-out both; }
 @keyframes dshs-flash {
   0% { opacity: 0; }
-  26% { opacity: .45; }
+  22% { opacity: .42; }
   100% { opacity: 0; }
 }
 

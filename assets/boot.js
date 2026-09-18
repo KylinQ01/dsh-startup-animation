@@ -248,11 +248,22 @@
     html.classList.add('dshs-boot-out')
     // 预览页会置上 __dshsNoRemember：在预览里放一遍不该让真实页面也跳过动画
     if (!window.__dshsNoRemember) { try { sessionStorage.setItem(SEEN_KEY, String(Date.now())) } catch (err) {} }
-    setTimeout(function () {
+
+    // 等淡出**真的**结束再摘节点。主界面这会儿正在首次渲染，主线程一忙，
+    // 走主线程的 opacity 过渡会比合成器上的位移晚开始；固定等 OUT_MS 就会把还没淡完的
+    // 启动页硬切掉 —— 那看起来就是"没有转场"。所以以 transitionend 为准，定时器只做兜底。
+    var done = false
+    function cleanup() {
+      if (done) return
+      done = true
       html.classList.remove('dshs-boot-out')
       if (node.parentNode) node.parentNode.removeChild(node)
       var css = doc.getElementById('dshs-css')
       if (css && css.parentNode) css.parentNode.removeChild(css)
-    }, OUT_MS + 120)
+    }
+    node.addEventListener('transitionend', function (event) {
+      if (event.target === node && event.propertyName === 'opacity') cleanup()
+    })
+    setTimeout(cleanup, OUT_MS + 600)
   }
 })()
