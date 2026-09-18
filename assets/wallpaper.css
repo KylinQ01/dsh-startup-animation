@@ -7,9 +7,13 @@
    深色主题不套用：浅色壁纸配浅色文字会糊成一片，切到深色就还是原来的深色界面。 */
 
 html body:not([data-ds-dark-theme]) {
+  /* 图片上压的那层白纱。启动页收尾「对焦」时会用同一组变量把白度补齐（见 boot.css 的
+     .dshs-handoff），所以改浓淡只改这两个值，两边一起变。 */
+  --dshs-wall-veil-a: rgba(253, 250, 254, .8);
+  --dshs-wall-veil-b: rgba(250, 247, 253, .68);
   --dsw-alias-bg-base: transparent;
   --dsw-specific-sidebar-fill: rgba(255, 255, 255, .78);
   background:
-    linear-gradient(rgba(253, 250, 254, .8), rgba(250, 247, 253, .68)),
+    linear-gradient(var(--dshs-wall-veil-a), var(--dshs-wall-veil-b)),
     url("/dsh-startup/bg") center / cover no-repeat fixed #f7f1f8;
 }

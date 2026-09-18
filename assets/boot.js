@@ -69,9 +69,10 @@
     var pings = ''
     for (var p = 0; p < 2; p++) pings += '<div class="dshs-ping"></div>'
     box.innerHTML =
-      // 远景：背景图 + 极光色块 + 旋转光束 + 星尘 + 上浮光点 + 掠过流星 + 斜向光带
+      // 背景单独一层，且刻意不留富余：盒子就是视口，取景因此和主界面壁纸逐像素对齐
+      '<div class="dshs-bg"><img src="/dsh-startup/bg" alt=""></div>' +
+      // 远景装饰：极光色块 + 旋转光束 + 星尘 + 上浮光点 + 掠过流星 + 斜向光带
       '<div class="dshs-world">' +
-        '<div class="dshs-bg"><img src="/dsh-startup/bg" alt=""></div>' +
         '<div class="dshs-aurora"><i></i><i></i><i></i></div>' +
         '<div class="dshs-rays"></div>' +
         '<div class="dshs-stars"></div>' +
@@ -79,8 +80,9 @@
         '<div class="dshs-streaks"><i></i><i></i></div>' +
         '<div class="dshs-sheen"></div>' +
       '</div>' +
-      // 中景：提亮面纱 + 跟随指针的暖光 + 呼吸暗角
+      // 中景：提亮面纱 + 收尾时顶上来的"壁纸白纱" + 跟随指针的暖光 + 呼吸暗角
       '<div class="dshs-veil"></div>' +
+      '<div class="dshs-handoff"></div>' +
       '<div class="dshs-cursor"></div>' +
       '<div class="dshs-vig"></div>' +
       // 近景：头像 + 柔光 + 两圈转动的加载环 + 一次性爆闪 + 两圈涟漪 + 迸出的星火 + 过场闪白

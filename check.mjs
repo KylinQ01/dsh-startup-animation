@@ -90,9 +90,13 @@ const classes = new Set(
 for (const name of classes) {
   assert.ok(splashCss.includes('.' + name), `boot.css 里缺少 .${name}，但 boot.js 会用到它`)
 }
-for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-rays', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark']) {
+for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-rays', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff']) {
   assert.ok(splashCss.includes('.' + layer), `boot.css 里缺少 .${layer}，这一层画面不该被删掉`)
 }
+// 收尾交接靠"启动页背景 == 主界面壁纸"：白纱必须来自同一组变量，且主界面那张图也是 cover
+assert.ok(wallCss.includes('--dshs-wall-veil-a') && wallCss.includes('--dshs-wall-veil-b'), '壁纸白纱要定义成变量，供收尾那层复用')
+assert.ok(splashCss.includes('--dshs-wall-veil-a') && splashCss.includes('--dshs-wall-veil-b'), '收尾层要消费同一组白纱变量')
+assert.ok(/\.dshs-bg\s*\{[^}]*inset:\s*0;/.test(splashCss), '启动页背景层不能留富余，否则和主界面壁纸的取景对不上')
 // 视差一半在 JS（写变量）一半在 CSS（消费变量），两边都得在
 assert.ok(js.includes('--dshs-px') && js.includes('--dshs-py'), 'boot.js 要把指针位置写进视差变量')
 assert.ok(splashCss.includes('--dshs-px') && splashCss.includes('--dshs-py'), 'boot.css 要消费视差变量')
@@ -270,6 +274,7 @@ assert.equal(previewRes.headers['Content-Type'], 'text/html; charset=utf-8')
 assert.ok(previewHtml.includes('<style id="dshs-css">'), '预览页要带上启动页样式')
 assert.ok(previewHtml.includes('<div id="root"></div>'), '预览页要有假主界面的挂载点')
 assert.ok(previewHtml.includes('__dshsNoRemember'), '预览页不该把真实页面的动画标记成"已播过"')
+assert.ok(previewHtml.includes('<style id="dshs-wall-css">'), '预览页要带上主界面壁纸，否则看不到收尾的交接')
 assert.ok(previewHtml.includes(BOOT_SRC), '预览页要引 boot.js')
 assert.ok(previewHtml.indexOf('dshs-css') < previewHtml.indexOf('<body'), '预览页的启动页样式也要落在 <head> 内')
 
