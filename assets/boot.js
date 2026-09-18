@@ -85,6 +85,7 @@
       '<div class="dshs-cursor"></div>' +
       '<div class="dshs-vig"></div>' +
       // 近景：头像 + 柔光 + 两圈转动的加载环 + 一次性爆闪 + 两圈涟漪 + 迸出的星火 + 过场闪白
+      // 最后是"进入主界面"时横扫整屏的光束：放在最上层，让主界面各模块是在光里拼上来的
       '<div class="dshs-flash"></div>' +
       '<div class="dshs-stage">' +
         '<div class="dshs-portrait">' +
@@ -100,7 +101,9 @@
         '<div class="dshs-accent"></div>' +
         '<div class="dshs-tip">' + TIP + '<i>.</i><i>.</i><i>.</i></div>' +
         '<div class="dshs-bar"><span></span><i class="dshs-orb"></i><i class="dshs-orb"></i></div>' +
-      '</div>'
+      '</div>' +
+      // 压在最上层：进入主界面时横扫整屏的那道光束
+      '<div class="dshs-beam"></div>'
     scatterStars(box.querySelector('.dshs-stars'))
     scatterPetals(box.querySelector('.dshs-petals'))
     scatterSparks(box.querySelector('.dshs-sparks'))

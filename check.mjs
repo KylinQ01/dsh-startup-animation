@@ -90,9 +90,12 @@ const classes = new Set(
 for (const name of classes) {
   assert.ok(splashCss.includes('.' + name), `boot.css 里缺少 .${name}，但 boot.js 会用到它`)
 }
-for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff']) {
+for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff', 'dshs-beam']) {
   assert.ok(splashCss.includes('.' + layer), `boot.css 里缺少 .${layer}，这一层画面不该被删掉`)
 }
+// 进入主界面那道横扫光束：关键帧必须在，而且要由 .is-out 触发（否则永远不亮）
+assert.ok(splashCss.includes('@keyframes dshs-beam'), 'boot.css 要有 dshs-beam 关键帧（进入主界面的光束）')
+assert.ok(/#dshs\.is-out \.dshs-beam\s*\{[^}]*animation:\s*dshs-beam/.test(splashCss), '光束要挂在 .is-out 上触发')
 // 低配机友好：这两样是掉帧主因。只提醒不拦——机器好的话想加回来是自由的。
 if (/\.dshs-bg\s*\{[^}]*filter:/.test(splashCss)) {
   console.log('… 注意：启动页背景挂了全屏 filter（blur），低配机上会明显掉帧')

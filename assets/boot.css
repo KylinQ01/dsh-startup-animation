@@ -227,6 +227,60 @@ html.dshs-boot #root { opacity: 0; }
 }
 #dshs.is-in.is-aim .dshs-cursor { opacity: 1; }
 
+/* 进入主界面时横扫整屏的光束：白亮芯 + 粉色内辉 + 淡紫外辉（参考品牌片里那道横光，
+   但配色走可爱系）。它从中间向两侧铺开，主界面各模块就在这道光里拼上来，最后连光一起淡掉。
+
+   ⚠️ 参考图是"黑底上一道亮光"，我们是**浅色壁纸**——纯亮的横带压在浅底上几乎看不出来。
+   所以这里多垫了一层很淡的暗带（淡紫、透明度 .14），让中间的白色亮芯有对比才立得住。
+   只有一条渐变层、只跑 transform + opacity，纯合成，低配机也吃得下。 */
+#dshs .dshs-beam {
+  position: absolute;
+  left: -3%;
+  right: -3%;
+  top: 50%;
+  height: 34vmin;
+  margin-top: -17vmin;
+  background:
+    /* 核心亮线：一条很窄的纯白芯 */
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0) 48.9%,
+      rgba(255, 214, 236, .95) 49.6%,
+      #fff 50%,
+      rgba(255, 214, 236, .95) 50.4%,
+      rgba(255, 255, 255, 0) 51.1%),
+    /* 粉色内辉 */
+    linear-gradient(180deg,
+      rgba(255, 170, 214, 0) 34%,
+      rgba(255, 170, 214, .34) 47%,
+      rgba(255, 196, 226, .42) 50%,
+      rgba(255, 170, 214, .34) 53%,
+      rgba(255, 170, 214, 0) 66%),
+    /* 暗对比带：浅色底上全靠它把亮芯托出来 */
+    linear-gradient(180deg,
+      rgba(120, 88, 150, 0) 2%,
+      rgba(120, 88, 150, .14) 40%,
+      rgba(120, 88, 150, 0) 48.5%,
+      rgba(120, 88, 150, 0) 51.5%,
+      rgba(120, 88, 150, .14) 60%,
+      rgba(120, 88, 150, 0) 98%),
+    /* 淡紫外辉 */
+    linear-gradient(180deg,
+      rgba(206, 170, 232, 0) 4%,
+      rgba(206, 170, 232, .22) 38%,
+      rgba(206, 170, 232, .22) 62%,
+      rgba(206, 170, 232, 0) 96%);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: 50% 50%;
+}
+#dshs.is-out .dshs-beam { animation: dshs-beam .7s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes dshs-beam {
+  0% { opacity: 0; transform: scaleX(0) scaleY(.4); }
+  16% { opacity: 1; transform: scaleX(1) scaleY(.55); }
+  38% { opacity: .95; transform: scaleX(1) scaleY(1); }
+  100% { opacity: 0; transform: scaleX(1) scaleY(2.4); }
+}
+
 /* 暗角：四角轻轻压暗，把视线收在正中。
    不呼吸——全屏不透明度动画等于整段时长都在混合整屏像素，低配机上不值。 */
 #dshs .dshs-vig {
@@ -591,7 +645,7 @@ html.dshs-boot #root { opacity: 0; }
 #dshs.is-out .dshs-flash { animation: dshs-flash .38s ease-out both; }
 @keyframes dshs-flash {
   0% { opacity: 0; }
-  22% { opacity: .42; }
+  22% { opacity: .28; }
   100% { opacity: 0; }
 }
 
@@ -619,6 +673,7 @@ html.dshs-boot #root { opacity: 0; }
   #dshs.is-in .dshs-tip i,
   #dshs.is-in .dshs-bar::after,
   #dshs.is-in .dshs-orb { animation: none; }
+  #dshs.is-out .dshs-beam { animation: none; }
   #dshs .dshs-cursor,
   #dshs .dshs-portrait { translate: none; transform: none; }
   #dshs .dshs-sheen,
