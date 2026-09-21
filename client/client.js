@@ -431,21 +431,21 @@ window.__ModuleLoader__.load({
 
     function SettingsSection() {
       const [state, setState] = useState(null)
-      const [config, setConfig] = useState(null)
+      // undefined = 还在读；null = 读失败；对象 = 读到了（失败也占着卡片位置，好让用户知道为什么改不了）
+      const [config, setConfig] = useState(undefined)
       const [error, setError] = useState(null)
 
       React.useEffect(() => {
         let alive = true
-        Promise.all([
-          fetch('/dsh-startup/images').then((answered) => answered.json()),
-          fetch('/dsh-startup/config').then((answered) => answered.json()),
-        ])
-          .then(([images, hero]) => {
-            if (!alive) return
-            setState(images)
-            if (hero && hero.ok === true) setConfig(hero.config)
-          })
+        // 两个接口各读各的：标题配置读不到，不该把换图那两张卡片也一起弄没
+        fetch('/dsh-startup/images')
+          .then((answered) => answered.json())
+          .then((data) => { if (alive) setState(data) })
           .catch((err) => { if (alive) setError(err && err.message ? err.message : String(err)) })
+        fetch('/dsh-startup/config')
+          .then((answered) => answered.json())
+          .then((data) => { if (alive) setConfig(data && data.ok === true ? data.config : null) })
+          .catch(() => { if (alive) setConfig(null) })
         return () => { alive = false }
       }, [])
 
@@ -467,7 +467,12 @@ window.__ModuleLoader__.load({
           '图片支持 PNG / JPEG / WebP / GIF，单张上限 12MB；点「选择图片」或直接把图拖到卡片上，',
           '换完上面的预览会自动重放一遍。'),
         h(Preview, { key: 'preview', state: state }),
-        config ? h(HeroCard, { key: 'hero', config: config, onSaved: heroSaved }) : null,
+        config ? h(HeroCard, { key: 'hero', config: config, onSaved: heroSaved }) : h('div', { key: 'hero', style: styles.formCard }, [
+          h('p', { key: 'title', style: styles.title }, '主界面标题'),
+          h('p', { key: 'hint', style: styles.hint }, config === null
+            ? '读不到宿主配置（/dsh-startup/config），所以这里暂时改不了。多半是插件刚更新、宿主还没重新挂载：在插件市场里把它重装一次（或重启 DSH）后再刷新本页即可。'
+            : '正在读取配置…'),
+        ]),
         ...SLOTS.map((item) => h(SlotCard, {
           key: item.slot,
           slot: item.slot,

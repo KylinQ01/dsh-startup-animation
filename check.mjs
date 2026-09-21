@@ -317,12 +317,23 @@ for (const label of ['打字机逐字显示', '闪烁光标', '隐藏标题旁�
   assert.ok(loadedTree.includes(label), `标题卡片要有「${label}」开关`)
 }
 assert.ok(loadedTree.includes('恢复默认'), '标题卡片要能恢复默认')
-// 配置没读回来时不该渲染这张卡片（否则输入框会以空值初始化，存盘就把配置清空了）
-const noConfigTree = flatten(renderSection({
+// 配置还没读回来 / 读失败时：卡片位置留一句说明，但不许出现可编辑的输入框
+// （否则输入框会以空值初始化，用户一存盘就把配置清空了）
+const pendingTree = flatten(renderSection({
   avatar: { custom: false, bytes: 4096 },
   bg: { custom: false, bytes: 8192 },
 }, undefined), []).join(' ')
-assert.ok(!noConfigTree.includes('主界面标题'), '配置没读回来之前不该渲染标题卡片')
+assert.ok(pendingTree.includes('正在读取配置'), '配置还没读回来时要有「正在读取」的占位')
+assert.ok(!pendingTree.includes('保存并生效'), '配置没读回来之前不该出现保存按钮')
+
+const failedTree = flatten(renderSection({
+  avatar: { custom: false, bytes: 4096 },
+  bg: { custom: false, bytes: 8192 },
+}, null), []).join(' ')
+assert.ok(failedTree.includes('读不到宿主配置'), '配置读失败时要告诉用户为什么改不了')
+assert.ok(!failedTree.includes('保存并生效'), '配置读失败时不该出现保存按钮')
+assert.ok(failedTree.includes('iframe'), '配置读失败不该把换图那两张卡片一起弄没')
+
 const loadingTree = flatten(renderSection(null, undefined), []).join(' ')
 assert.ok(!loadingTree.includes('iframe'), '状态没读回来之前不该挂 iframe（否则会连播两遍）')
 assert.ok(loadingTree.includes('正在读取图片状态'), '没读回来时要有占位')
