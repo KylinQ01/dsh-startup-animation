@@ -50,10 +50,14 @@ html.dshs-boot #root { opacity: 0; }
 /* 装饰层留富余：视差移动时边不会露出来（背景层不在这里，它必须严格等于视口）。 */
 #dshs .dshs-world { position: absolute; inset: -4%; }
 
-/* 几个只负责"装着随机元素"的层，本身不画东西。 */
+/* 几个只负责"装着随机元素"的层，本身不画东西。
+   .dshs-fest 是节日粒子的承载层 —— 它必须铺满视口：粒子是按百分比定位的，
+   承载层一旦是 0×0 的小盒子，所有粒子都会叠在它的原点（曾经把粒子类名直接当承载层用过，
+   雪和纸屑就全跑到视口外了）。 */
 #dshs .dshs-stars,
 #dshs .dshs-petals,
-#dshs .dshs-streaks { position: absolute; inset: 0; }
+#dshs .dshs-streaks,
+#dshs .dshs-fest { position: absolute; inset: 0; }
 
 /* 背景图（图二）：**盒子就是视口，故意不留富余**——这样 `object-fit: cover` 的取景和
    主界面壁纸（body 上的 `center / cover`）逐像素一致，收尾时两张图才能严丝合缝地接上。
@@ -655,10 +659,12 @@ html.dshs-fest-snow #dshs .dshs-petal {
 /* 雪：从上往下落，横向慢慢偏；和"上浮光点"正好反向，一眼能看出是下雪不是飘花。 */
 #dshs .dshs-snow {
   position: absolute;
-  top: -6vmin;
+  top: -8vmin;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, .92) 45%, rgba(214, 232, 255, 0) 100%);
-  box-shadow: 0 0 6px rgba(214, 232, 255, .85);
+  /* 白芯 + 冷蓝灰边：壁纸本身很白的时候，纯白的雪花会"隐身"
+     （和星尘用"白芯 + 淡紫光晕"是同一个理由）。 */
+  background: radial-gradient(circle, #fff 0%, #fff 42%, rgba(168, 196, 226, .85) 72%, rgba(168, 196, 226, 0) 100%);
+  box-shadow: 0 0 7px rgba(150, 180, 214, .9);
   opacity: 0;
 }
 #dshs.is-in .dshs-snow { animation: dshs-snowfall linear infinite; }
@@ -669,11 +675,31 @@ html.dshs-fest-snow #dshs .dshs-petal {
   100% { opacity: 0; transform: translate3d(var(--dshs-drift, 2vmin), 112vh, 0) rotate(calc(var(--dshs-spin, 0deg) + 220deg)); }
 }
 
+/* 樱花瓣（春季彩蛋）：**花瓣形状**而不是圆点 —— 两个对角尖角切出花瓣轮廓，
+   边落边左右打摆并翻转。粉色渐变从近白到粉，浅色壁纸上也能读出来。 */
+#dshs .dshs-sakura {
+  position: absolute;
+  top: -8vmin;
+  background: linear-gradient(135deg, #fff5f9 0%, #ffd0e0 42%, #ff9dc4 100%);
+  box-shadow: 0 1px 3px rgba(214, 120, 160, .28);
+  opacity: 0;
+}
+#dshs.is-in .dshs-sakura { animation: dshs-sakura-fall linear infinite; }
+@keyframes dshs-sakura-fall {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  10% { opacity: .95; }
+  30% { transform: translate3d(var(--dshs-sway, 3vmin), 32vh, 0) rotate(calc(var(--dshs-spin, 180deg) * .3)); }
+  60% { transform: translate3d(calc(var(--dshs-sway, 3vmin) * -.6), 68vh, 0) rotate(calc(var(--dshs-spin, 180deg) * .65)); }
+  85% { opacity: .85; }
+  100% { opacity: 0; transform: translate3d(var(--dshs-sway, 3vmin), 114vh, 0) rotate(var(--dshs-spin, 180deg)); }
+}
+
 /* 生日彩屑：小方块边落边翻。 */
 #dshs .dshs-confetti {
   position: absolute;
   top: -6vmin;
   border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(90, 70, 120, .25);
   opacity: 0;
 }
 #dshs.is-in .dshs-confetti { animation: dshs-confetti-fall linear infinite; }

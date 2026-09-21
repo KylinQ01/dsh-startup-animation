@@ -45,13 +45,16 @@
   var STARS = TIER.stars
   var PETALS = TIER.petals
   var SPARKS = TIER.sparks
-  // 节日在档位基础上再加一层，但**不许低于标准档的量**：省电档基础花瓣是 0，
-  // 按"加 8"算只剩 8 片，选了半天樱花却几乎看不出来。
-  if (FESTIVAL === 'sakura') PETALS = Math.max(PETALS, COUNTS.standard.petals) + 8
-  if (FESTIVAL === 'snow') PETALS = 0              // 下雪天就别再飘花瓣了，两种粒子一起飞很乱
+  /* 节日粒子在档位之外单独算，且**不许低于标准档的量**（省电档基础花瓣是 0，
+     按"加 8"算只剩几片，选了半天樱花却几乎看不出来）。
+     樱花不再复用"上浮光点"：那是圆形柔光，染成粉色只会像气泡；
+     真正的樱花瓣是另一套粒子（花瓣形状 + 边落边翻，见 scatterSakura）。 */
+  var SAKURA = FESTIVAL === 'sakura' ? Math.max(TIER.petals, COUNTS.standard.petals) + 10 : 0
+  var SNOW = FESTIVAL === 'snow' ? Math.max(TIER.sparks, 8) + 14 : 0
+  var CONFETTI = FESTIVAL === 'birthday' ? 16 : 0
+  if (FESTIVAL === 'sakura' || FESTIVAL === 'snow') PETALS = 0   // 花瓣/雪自己会飘，圆光点就别来凑热闹了
   if (FESTIVAL === 'newyear') SPARKS = Math.max(SPARKS, COUNTS.standard.sparks) + 6
-  var SNOW = FESTIVAL === 'snow' ? 18 : 0        // 飘雪：从上往下落
-  var CONFETTI = FESTIVAL === 'birthday' ? 14 : 0 // 生日：彩色纸屑
+  var FEST_PARTICLES = SAKURA + SNOW + CONFETTI                  // 有节日粒子才建承载层
 
   // 节日顺手改一句问候：打开软件那一下就知道"今天有彩蛋"
   var HELLO = FESTIVAL === 'birthday' ? '生日快乐' : (FESTIVAL === 'newyear' ? '新年快乐' : '欢迎回来')
@@ -107,8 +110,10 @@
         '<div class="dshs-aurora"><i></i><i></i></div>' +
         '<div class="dshs-stars"></div>' +
         '<div class="dshs-petals"></div>' +
-        (SNOW > 0 ? '<div class="dshs-snow"></div>' : '') +
-        (CONFETTI > 0 ? '<div class="dshs-confetti"></div>' : '') +
+        // 节日粒子共用一个承载层：它必须是铺满视口的盒子（inset: 0），
+        // 否则粒子会全叠在它的原点 —— 之前雪和纸屑各自复用了粒子类名当承载层，
+        // 结果那个盒子是 0×0 且位于视口上方，一片都看不到。
+        (FEST_PARTICLES > 0 ? '<div class="dshs-fest"></div>' : '') +
         '<div class="dshs-streaks"><i></i><i></i></div>' +
         '<div class="dshs-sheen"></div>' +
       '</div>' +
@@ -137,8 +142,9 @@
     scatterStars(box.querySelector('.dshs-stars'))
     scatterPetals(box.querySelector('.dshs-petals'))
     scatterSparks(box.querySelector('.dshs-sparks'))
-    if (SNOW > 0) scatterSnow(box.querySelector('.dshs-snow'))
-    if (CONFETTI > 0) scatterConfetti(box.querySelector('.dshs-confetti'))
+    if (SAKURA > 0) scatterSakura(box.querySelector('.dshs-fest'))
+    if (SNOW > 0) scatterSnow(box.querySelector('.dshs-fest'))
+    if (CONFETTI > 0) scatterConfetti(box.querySelector('.dshs-fest'))
     return box
   }
 
@@ -198,11 +204,35 @@
     }
   }
 
+  /**
+   * 樱花瓣（春季彩蛋）：**不是圆点**——花瓣形状靠不规则的圆角切出来，大小/翻转速/飘摆都随机，
+   * 边落边左右打摆。之前这一档只是把"上浮的圆形柔光"染成粉色，看起来就是一堆气泡。
+   */
+  function scatterSakura(host) {
+    if (calm) return
+    for (var i = 0; i < SAKURA; i++) {
+      var size = 7 + Math.random() * 7
+      var petal = doc.createElement('i')
+      petal.className = 'dshs-sakura'
+      petal.style.cssText =
+        'left:' + (Math.random() * 100).toFixed(2) + '%;' +
+        'width:' + size.toFixed(1) + 'px;' +
+        'height:' + (size * 1.15).toFixed(1) + 'px;' +
+        // 两种朝向的尖角，混着撒才不像复制粘贴
+        'border-radius:' + (Math.random() < 0.5 ? '100% 0 100% 0' : '0 100% 0 100%') + ';' +
+        'animation-duration:' + (9 + Math.random() * 7).toFixed(1) + 's;' +
+        'animation-delay:' + (-Math.random() * 12).toFixed(1) + 's;' +
+        '--dshs-sway:' + (2 + Math.random() * 5).toFixed(1) + 'vmin;' +
+        '--dshs-spin:' + (Math.random() * 420 - 210).toFixed(0) + 'deg;'
+      host.appendChild(petal)
+    }
+  }
+
   /** 飘雪（冬季彩蛋）：从上往下落，横向慢慢偏，和"上浮光点"正好反向。 */
   function scatterSnow(host) {
     if (calm) return
     for (var i = 0; i < SNOW; i++) {
-      var size = 3 + Math.random() * 5
+      var size = 5 + Math.random() * 6
       var flake = doc.createElement('i')
       flake.className = 'dshs-snow'
       flake.style.cssText =

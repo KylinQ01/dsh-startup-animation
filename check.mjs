@@ -121,6 +121,19 @@ for (const fest of ['sakura', 'snow', 'newyear', 'birthday']) {
 assert.ok(splashCss.includes('@keyframes dshs-snowfall'), 'boot.css 要有飘雪的下落关键帧')
 assert.ok(splashCss.includes('@keyframes dshs-confetti-fall'), 'boot.css 要有彩屑的关键帧')
 assert.ok(js.includes('scatterSnow') && js.includes('scatterConfetti'), 'boot.js 要能撒雪与彩屑')
+// 节日粒子的承载层必须铺满视口：粒子按百分比定位，承载层一旦是 0×0 的小盒子，
+// 所有粒子都会叠在它的原点 —— 雪和纸屑曾经因为"拿粒子类名当承载层"整片跑到视口外。
+const festHost = /[^{}]*\.dshs-fest[^{}]*\{([^}]*)\}/.exec(splashCss)
+assert.ok(festHost !== null, 'boot.css 要有节日粒子的承载层 .dshs-fest')
+assert.ok(/inset:\s*0/.test(festHost[1]), '承载层必须 inset: 0，否则粒子全叠在原点（踩过一次）')
+assert.ok(/#dshs \.dshs-snow \{/.test(splashCss), 'boot.css 要有雪花样式')
+assert.ok(/radial-gradient\(circle, #fff 0%, #fff 42%, rgba\(168, 196, 226/.test(splashCss), '雪花要有冷色边，否则在浅色壁纸上会隐身')
+// 樱花必须是"花瓣"而不是被染粉的圆点（用户实测：那是气泡不是樱花）
+assert.ok(/#dshs \.dshs-sakura \{/.test(splashCss), 'boot.css 要有樱花瓣样式')
+assert.ok(splashCss.includes('@keyframes dshs-sakura-fall'), 'boot.css 要有樱花瓣飘落关键帧')
+assert.ok(js.includes('scatterSakura'), 'boot.js 要撒樱花瓣')
+assert.ok(js.includes("'border-radius:'"), '花瓣朝向要随机（靠不规则圆角切出花瓣形状）')
+assert.ok(js.includes('PETALS = 0'), '樱花/飘雪时不再撒上浮光点（圆点会变成"气泡"）')
 assert.ok(js.includes('window.__dshsConfig'), 'boot.js 要读宿主注入的配置（档位/节日/强制动效）')
 assert.ok(js.includes('festivalActive'), 'boot.js 要按"今天生效的节日"决定粒子与问候语')
 assert.ok(js.includes('CONFIG.forceMotion'), 'boot.js 的「强制播放动效」要能覆盖系统的减少动态效果')
