@@ -577,6 +577,8 @@ html.dshs-boot #root { opacity: 0; }
 #dshs.is-out .dshs-orbit,
 #dshs.is-out .dshs-sheen,
 #dshs.is-out .dshs-petal,
+#dshs.is-out .dshs-snow,
+#dshs.is-out .dshs-confetti,
 #dshs.is-out .dshs-star,
 #dshs.is-out .dshs-streaks,
 #dshs.is-out .dshs-aurora i,
@@ -605,47 +607,186 @@ html.dshs-boot #root { opacity: 0; }
   #dshs .dshs-bar { width: clamp(120px, 30vmin, 190px); height: 4px; }
 }
 
+/* ══ 节日彩蛋 ══════════════════════════════════════════════════════════
+   节日只改"配色 + 这一天的专属粒子"，**绝不动背景层与白纱** ——
+   收尾那三处对齐（取景／1:1／白度）里有两处挂在背景与 handoff 上，一改过场就会跳。
+   极光、星尘这些在 .is-out 里本来就会淡出，所以换色是安全的。
+
+   樱花季（3/20~4/20）：粉樱配色 + 多撒的花瓣；跨年（1/1~1/3）：金红配色；
+   飘雪（12/1~2/15）：冷色调 + 自上而下的雪；生日：粉紫配色 + 彩色纸屑。 */
+
+html.dshs-fest-sakura #dshs .dshs-aurora i:nth-child(1) {
+  background: radial-gradient(circle, rgba(255, 176, 205, .58), rgba(255, 176, 205, 0) 64%);
+}
+html.dshs-fest-sakura #dshs .dshs-aurora i:nth-child(2) {
+  background: radial-gradient(circle, rgba(255, 214, 232, .5), rgba(255, 214, 232, 0) 64%);
+}
+html.dshs-fest-sakura #dshs .dshs-petal {
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, .98), rgba(255, 158, 196, .9) 55%, rgba(255, 158, 196, 0) 100%);
+}
+
+html.dshs-fest-newyear #dshs .dshs-aurora i:nth-child(1) {
+  background: radial-gradient(circle, rgba(255, 196, 120, .5), rgba(255, 196, 120, 0) 64%);
+}
+html.dshs-fest-newyear #dshs .dshs-aurora i:nth-child(2) {
+  background: radial-gradient(circle, rgba(255, 130, 130, .42), rgba(255, 130, 130, 0) 64%);
+}
+html.dshs-fest-newyear #dshs .dshs-star {
+  background: radial-gradient(circle, #fff 0%, #ffe6b0 40%, rgba(255, 200, 120, 0) 100%);
+}
+
+html.dshs-fest-birthday #dshs .dshs-aurora i:nth-child(1) {
+  background: radial-gradient(circle, rgba(255, 170, 220, .55), rgba(255, 170, 220, 0) 64%);
+}
+html.dshs-fest-birthday #dshs .dshs-aurora i:nth-child(2) {
+  background: radial-gradient(circle, rgba(170, 170, 255, .5), rgba(170, 170, 255, 0) 64%);
+}
+
+html.dshs-fest-snow #dshs .dshs-aurora i:nth-child(1) {
+  background: radial-gradient(circle, rgba(178, 216, 255, .45), rgba(178, 216, 255, 0) 64%);
+}
+html.dshs-fest-snow #dshs .dshs-aurora i:nth-child(2) {
+  background: radial-gradient(circle, rgba(206, 214, 255, .42), rgba(206, 214, 255, 0) 64%);
+}
+html.dshs-fest-snow #dshs .dshs-petal {
+  background: radial-gradient(circle at 35% 35%, #fff, rgba(214, 232, 255, .85) 55%, rgba(214, 232, 255, 0) 100%);
+}
+
+/* 雪：从上往下落，横向慢慢偏；和"上浮光点"正好反向，一眼能看出是下雪不是飘花。 */
+#dshs .dshs-snow {
+  position: absolute;
+  top: -6vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, .92) 45%, rgba(214, 232, 255, 0) 100%);
+  box-shadow: 0 0 6px rgba(214, 232, 255, .85);
+  opacity: 0;
+}
+#dshs.is-in .dshs-snow { animation: dshs-snowfall linear infinite; }
+@keyframes dshs-snowfall {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(var(--dshs-spin, 0deg)); }
+  12% { opacity: .92; }
+  80% { opacity: .7; }
+  100% { opacity: 0; transform: translate3d(var(--dshs-drift, 2vmin), 112vh, 0) rotate(calc(var(--dshs-spin, 0deg) + 220deg)); }
+}
+
+/* 生日彩屑：小方块边落边翻。 */
+#dshs .dshs-confetti {
+  position: absolute;
+  top: -6vmin;
+  border-radius: 2px;
+  opacity: 0;
+}
+#dshs.is-in .dshs-confetti { animation: dshs-confetti-fall linear infinite; }
+@keyframes dshs-confetti-fall {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg) scaleX(1); }
+  10% { opacity: 1; }
+  50% { transform: translate3d(calc(var(--dshs-drift, 2vmin) * .6), 56vh, 0) rotate(calc(var(--dshs-spin, 360deg) * .5)) scaleX(.35); }
+  85% { opacity: .9; }
+  100% { opacity: 0; transform: translate3d(var(--dshs-drift, 2vmin), 112vh, 0) rotate(var(--dshs-spin, 360deg)) scaleX(1); }
+}
+
+/* ══ 画质档位 ══════════════════════════════════════════════════════════
+   默认档（standard）= 上面那套"照着老机器调过"的画面，一个像素都不变。
+   省电档再砍一层；华丽档把 README 里列过的那几项"逐帧重绘"开销加回来。
+
+   华丽档的背景模糊**必须在收尾归零**（.is-out 那条），否则和主界面壁纸对不上；
+   常驻循环全部带 :not(.is-out)，免得过场那 700ms 里还在整屏重算。 */
+
+/* 省电档：极光不漂移（静止渐变），指针视差与跟随暖光由 boot.js 直接不启动。 */
+html.dshs-fx-eco #dshs .dshs-aurora i { animation: none; }
+html.dshs-fx-eco #dshs .dshs-cursor { display: none; }
+
+/* 华丽档 · 背景推近时带一层模糊（收尾淡掉，"背景由虚转实"那一下更明显） */
+html.dshs-fx-fancy #dshs .dshs-bg { filter: blur(6px); }
+html.dshs-fx-fancy #dshs.is-in .dshs-bg {
+  transition: opacity .8s ease, translate .55s cubic-bezier(.22, .61, .36, 1), transform 26s ease-out, filter .8s ease .1s;
+}
+html.dshs-fx-fancy #dshs.is-out .dshs-bg {
+  filter: blur(0px);
+  transition: transform .7s cubic-bezier(.4, 0, .2, 1), translate .6s cubic-bezier(.4, 0, .2, 1), filter .7s ease;
+}
+
+/* 华丽档 · 极光缩放（柔光缩放要重新栅格化，正是省电档不做它的原因）。
+   常驻循环一律挂在 .dshs-motion 下 —— 那是 boot.js 按"减少动态效果 + 强制播放开关"算出来的；
+   只靠 @media 挡不住：华丽档的选择器优先级更高，会把下面 reduce 那块压过去。 */
+html.dshs-motion.dshs-fx-fancy #dshs:not(.is-out) .dshs-aurora i:nth-child(1) { animation: dshs-aura-a-fancy 30s ease-in-out infinite; }
+html.dshs-motion.dshs-fx-fancy #dshs:not(.is-out) .dshs-aurora i:nth-child(2) { animation: dshs-aura-b-fancy 38s ease-in-out infinite; }
+@keyframes dshs-aura-a-fancy {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(5vmax, 3vmax, 0) scale(1.12); }
+}
+@keyframes dshs-aura-b-fancy {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-4vmax, -3vmax, 0) scale(1.1); }
+}
+
+/* 华丽档 · 暗角呼吸（全屏不透明度动画）与头像内部缓慢推近（圆角里每帧重裁） */
+html.dshs-motion.dshs-fx-fancy #dshs.is-in:not(.is-out) .dshs-vig { animation: dshs-vig-breath 7s ease-in-out 1.4s infinite; }
+@keyframes dshs-vig-breath {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .82; }
+}
+html.dshs-motion.dshs-fx-fancy #dshs.is-in:not(.is-out) .dshs-avatar img { animation: dshs-avatar-zoom 26s ease-out both; }
+@keyframes dshs-avatar-zoom {
+  from { transform: scale(1.09); }
+  to { transform: scale(1); }
+}
+/* 华丽档 · 星尘把砍掉的那层光晕加回来 */
+html.dshs-fx-fancy #dshs .dshs-star {
+  box-shadow: 0 0 6px rgba(186, 156, 224, .75), 0 0 14px rgba(255, 196, 224, .5);
+}
+
 /* 系统开了「减少动态效果」时：
-   **关掉**的是一切"会一直动"和"跟着人动"的东西 —— 星尘/光点/流星、极光漂移、柔光呼吸、
-   加载环旋转、头像浮动、玻璃反光、指针视差与 3D 倾斜、背景推近；
+   **关掉**的是一切"会一直动"和"跟着人动"的东西 —— 星尘/光点/雪花/纸屑/流星、极光漂移、
+   柔光呼吸、加载环旋转、头像浮动、玻璃反光、指针视差与 3D 倾斜、背景推近；
    **保留**的是一次性的入场：模块组装（行程由 boot.js 收到 35%）与启动页淡出。
    理由是这条设置针对的是大位移、视差、持续旋转这类容易引发不适的动效，
-   而不是"入场不许有任何动画"——全砍掉的结果就是这台机器上什么都看不见。 */
+   而不是"入场不许有任何动画"——全砍掉的结果就是这台机器上什么都看不见。
+
+   设置里勾了「强制播放动效」（html.dshs-force-motion）就整块跳过：
+   Windows 的「辅助功能 → 视觉效果 → 动画效果」关掉时，这条媒体查询就是 reduce，
+   不加这个逃生口的话那台机器上永远只能看精简版。 */
 @media (prefers-reduced-motion: reduce) {
-  #dshs .dshs-aurora i,
-  #dshs .dshs-star,
-  #dshs .dshs-halo,
-  #dshs.is-in .dshs-avatar,
-  #dshs.is-in .dshs-ping,
-  #dshs.is-in .dshs-burst,
-  #dshs.is-in .dshs-shine,
-  #dshs.is-in .dshs-orbit,
-  #dshs.is-in .dshs-spark,
-  #dshs.is-in .dshs-tip i,
-  #dshs.is-in .dshs-bar::after,
-  #dshs.is-in .dshs-orb { animation: none; }
+  html:not(.dshs-force-motion) #dshs .dshs-aurora i,
+  html:not(.dshs-force-motion) #dshs .dshs-star,
+  html:not(.dshs-force-motion) #dshs .dshs-halo,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-avatar,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-ping,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-burst,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-shine,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-orbit,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-spark,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-snow,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-confetti,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-tip i,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-bar::after,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-orb { animation: none; }
   /* 背景不推近也不收束：静止在 1:1，收尾照样和主界面壁纸严丝合缝 */
-  #dshs .dshs-bg,
-  #dshs.is-in .dshs-bg { transform: scale(1); animation: none; }
-  #dshs .dshs-cursor,
-  #dshs .dshs-portrait { translate: none; transform: none; }
-  #dshs .dshs-sheen,
-  #dshs .dshs-petal,
-  #dshs .dshs-star,
-  #dshs .dshs-streaks { display: none; }
-  #dshs .dshs-world,
-  #dshs .dshs-halo,
-  #dshs .dshs-stage { translate: none; }
-  html.dshs-boot #root,
-  #dshs.is-in .dshs-avatar,
-  #dshs.is-in .dshs-hello span,
-  #dshs.is-in .dshs-accent,
-  #dshs.is-in .dshs-tip,
-  #dshs.is-in .dshs-bar,
-  #dshs.is-out,
-  #dshs.is-out .dshs-world,
-  #dshs.is-out .dshs-handoff,
-  #dshs.is-out .dshs-stage {
+  html:not(.dshs-force-motion) #dshs .dshs-bg,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-bg { transform: scale(1); animation: none; }
+  /* 华丽档的全屏模糊也不留：没有推近收束，模糊就没有淡出的那一拍 */
+  html:not(.dshs-force-motion).dshs-fx-fancy #dshs .dshs-bg { filter: none; }
+  html:not(.dshs-force-motion) #dshs .dshs-cursor,
+  html:not(.dshs-force-motion) #dshs .dshs-portrait { translate: none; transform: none; }
+  html:not(.dshs-force-motion) #dshs .dshs-sheen,
+  html:not(.dshs-force-motion) #dshs .dshs-petal,
+  html:not(.dshs-force-motion) #dshs .dshs-star,
+  html:not(.dshs-force-motion) #dshs .dshs-snow,
+  html:not(.dshs-force-motion) #dshs .dshs-confetti,
+  html:not(.dshs-force-motion) #dshs .dshs-streaks { display: none; }
+  html:not(.dshs-force-motion) #dshs .dshs-world,
+  html:not(.dshs-force-motion) #dshs .dshs-halo,
+  html:not(.dshs-force-motion) #dshs .dshs-stage { translate: none; }
+  html:not(.dshs-force-motion).dshs-boot #root,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-avatar,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-hello span,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-accent,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-tip,
+  html:not(.dshs-force-motion) #dshs.is-in .dshs-bar,
+  html:not(.dshs-force-motion) #dshs.is-out,
+  html:not(.dshs-force-motion) #dshs.is-out .dshs-world,
+  html:not(.dshs-force-motion) #dshs.is-out .dshs-handoff,
+  html:not(.dshs-force-motion) #dshs.is-out .dshs-stage {
     transition-duration: .2s;
     transition-delay: 0s;
   }

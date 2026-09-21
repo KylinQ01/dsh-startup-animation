@@ -28,7 +28,8 @@
   100% { opacity: .8; }
 }
 
-/* 系统开了「减少动态效果」就让它常亮，别一闪一闪的。 */
+/* 系统开了「减少动态效果」就让它常亮，别一闪一闪的。
+   设置里勾了「强制播放动效」就照闪（Windows 关了动画效果时这条媒体查询就是 reduce）。 */
 @media (prefers-reduced-motion: reduce) {
-  .dshs-hero-typed::after { animation: none; opacity: .8; }
+  html:not(.dshs-force-motion) .dshs-hero-typed::after { animation: none; opacity: .8; }
 }

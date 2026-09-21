@@ -22,7 +22,7 @@ const BOOT_SRC = '<script defer src="' + BASE + '/boot.js"></script>'
 // 上传测试必须写进临时目录：插件在 import 时就读 DSH_HOME，所以先改环境再动态 import
 const sandboxHome = mkdtempSync(join(tmpdir(), 'dsh-startup-check-'))
 process.env.DSH_HOME = sandboxHome
-const { default: plugin } = await import('./lib/index.js')
+const { default: plugin, activeFestival } = await import('./lib/index.js')
 
 // 1) 用假 ctx 跑一遍 apply，收下路由、index 注入与日志
 const routes = new Map()
@@ -94,13 +94,52 @@ for (const name of classes) {
 for (const layer of ['dshs-world', 'dshs-aurora', 'dshs-star', 'dshs-petals', 'dshs-streaks', 'dshs-shine', 'dshs-accent', 'dshs-tip', 'dshs-orb', 'dshs-cursor', 'dshs-orbit', 'dshs-spark', 'dshs-handoff']) {
   assert.ok(splashCss.includes('.' + layer), `boot.css 里缺少 .${layer}，这一层画面不该被删掉`)
 }
-// 低配机友好：这两样是掉帧主因。只提醒不拦——机器好的话想加回来是自由的。
-if (/\.dshs-bg\s*\{[^}]*filter:/.test(splashCss)) {
-  console.log('… 注意：启动页背景挂了全屏 filter（blur），低配机上会明显掉帧')
+// 画质档位：全屏模糊只能出现在「华丽」档下（默认/省电档必须一个像素都不变），
+// 而且华丽档必须在收尾把模糊归零 —— 否则和主界面壁纸对不上，那一下会跳。
+for (const block of splashCss.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+  if (!/\.dshs-bg\b/.test(block[1]) || !/filter\s*:/.test(block[2])) continue
+  assert.ok(/dshs-fx-fancy/.test(block[1]), `启动页背景的 filter 只能挂在「华丽」档下：${block[1].trim()}`)
 }
+assert.ok(
+  /html\.dshs-fx-fancy #dshs\.is-out \.dshs-bg \{[^}]*filter:\s*blur\(0/.test(splashCss),
+  '华丽档的背景模糊必须在收尾归零，否则和主界面壁纸的取景对不上',
+)
+assert.ok(splashCss.includes('html.dshs-fx-eco'), 'boot.css 要有省电档的覆盖规则')
+assert.ok(splashCss.includes('html.dshs-fx-fancy'), 'boot.css 要有华丽档的覆盖规则')
+// 华丽档的常驻循环必须挂在 .dshs-motion 下：只写 @media 挡不住（华丽档选择器优先级更高，
+// 会把 reduce 那块压过去，"减少了动态效果"的机器上极光照样在缩放）。
+assert.ok(splashCss.includes('html.dshs-motion.dshs-fx-fancy'), '华丽档的常驻循环要挂在 .dshs-motion 下')
+assert.ok(js.includes("classList.toggle('dshs-motion'"), 'boot.js 要把"允许动效"镜像成 html.dshs-motion')
+assert.ok(js.includes("FX === 'eco'"), '省电档要跳过指针视差与跟随暖光')
 if (splashCss.includes('mask-image')) {
   console.log('… 注意：启动页用了 mask（大层遮罩混合），低配机上会明显掉帧')
 }
+// 节日彩蛋：只换配色与专属粒子，且新粒子的类名/关键帧两边都要在
+for (const fest of ['sakura', 'snow', 'newyear', 'birthday']) {
+  assert.ok(splashCss.includes(`html.dshs-fest-${fest}`), `boot.css 要有 ${fest} 的配色规则`)
+}
+assert.ok(splashCss.includes('@keyframes dshs-snowfall'), 'boot.css 要有飘雪的下落关键帧')
+assert.ok(splashCss.includes('@keyframes dshs-confetti-fall'), 'boot.css 要有彩屑的关键帧')
+assert.ok(js.includes('scatterSnow') && js.includes('scatterConfetti'), 'boot.js 要能撒雪与彩屑')
+assert.ok(js.includes('window.__dshsConfig'), 'boot.js 要读宿主注入的配置（档位/节日/强制动效）')
+assert.ok(js.includes('festivalActive'), 'boot.js 要按"今天生效的节日"决定粒子与问候语')
+assert.ok(js.includes('CONFIG.forceMotion'), 'boot.js 的「强制播放动效」要能覆盖系统的减少动态效果')
+assert.ok(splashCss.includes('html:not(.dshs-force-motion)'), 'boot.css 的减少动态效果那块要留强制动效的逃生口')
+
+// 5b) 节日日期窗口：拿固定日期跑一遍纯函数（跨年窗口 + 优先级最容易悄悄写错）
+const at = (day) => new Date(`${day}T12:00:00`)
+const AUTO = { festival: 'auto', birthday: '' }
+assert.equal(activeFestival(AUTO, at('2026-03-25')), 'sakura', '3 月下旬应是樱花季')
+assert.equal(activeFestival(AUTO, at('2026-04-20')), 'sakura', '樱花季窗口的末日要含进去')
+assert.equal(activeFestival(AUTO, at('2026-04-21')), '', '出了窗口就不该有节日')
+assert.equal(activeFestival(AUTO, at('2026-01-02')), 'newyear', '元旦那几天优先于飘雪')
+assert.equal(activeFestival(AUTO, at('2026-01-20')), 'snow', '1 月下旬仍是飘雪窗口')
+assert.equal(activeFestival(AUTO, at('2026-12-24')), 'snow', '12 月是飘雪窗口（跨年那一半）')
+assert.equal(activeFestival(AUTO, at('2026-07-01')), '', '夏天默认没有节日')
+assert.equal(activeFestival({ festival: 'auto', birthday: '07-01' }, at('2026-07-01')), 'birthday', '生日优先于自动窗口')
+assert.equal(activeFestival({ festival: 'off', birthday: '07-01' }, at('2026-07-01')), '', '关掉之后连生日也不演')
+assert.equal(activeFestival({ festival: 'sakura', birthday: '' }, at('2026-07-01')), 'sakura', '手动指定不受日期限制')
+assert.equal(activeFestival({ festival: 'birthday', birthday: '' }, at('2026-07-01')), '', '手选了生日却没填日期，退回自动')
 // 收尾交接靠"启动页背景 == 主界面壁纸"：白纱必须来自同一组变量，且主界面那张图也是 cover
 assert.ok(wallCss.includes('--dshs-wall-veil-a') && wallCss.includes('--dshs-wall-veil-b'), '壁纸白纱要定义成变量，供收尾那层复用')
 assert.ok(splashCss.includes('--dshs-wall-veil-a') && splashCss.includes('--dshs-wall-veil-b'), '收尾层要消费同一组白纱变量')
@@ -203,6 +242,10 @@ assert.equal(fresh.headline, '你好，我是和栗薰子，欢迎使用Deepseek
 assert.equal(fresh.typewriter, true)
 assert.equal(fresh.hideLogo, true, '默认要摘掉 logo')
 assert.equal(fresh.hideBadge, true, '默认要摘掉「预览版」徽章')
+assert.equal(fresh.fx, 'standard', '默认画质档位是「标准」——老用户看到的画面不该变')
+assert.equal(fresh.forceMotion, false)
+assert.equal(fresh.festival, 'auto', '默认跟着日期走')
+assert.equal(fresh.birthday, '', '默认没填生日')
 
 const patched = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ headline: '测试文案', speed: 200 })), 'POST')).body)
 assert.equal(patched.ok, true, '保存配置应成功')
@@ -210,6 +253,23 @@ assert.equal(patched.config.headline, '测试文案')
 assert.equal(patched.config.speed, 200)
 assert.equal(patched.config.cursorChar, fresh.cursorChar, '只改了两个字段，其余项要保持原值')
 assert.equal((await readConfig()).headline, '测试文案', '保存后要真的落盘（重新读一次）')
+
+// 档位 / 节日 / 生日：合法值要存下，非法值要退回原值，手动指定的节日要立刻回报
+const tiered = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ fx: 'fancy', festival: 'snow', birthday: '12-24', forceMotion: true })), 'POST')).body)
+assert.equal(tiered.config.fx, 'fancy')
+assert.equal(tiered.config.forceMotion, true)
+assert.equal(tiered.config.festival, 'snow')
+assert.equal(tiered.config.birthday, '12-24')
+assert.equal(tiered.festival, 'snow', '手动指定节日后，回报的"今天"就该是它')
+
+const junk = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ fx: 'ultra', festival: 'xmas', birthday: '13-45' })), 'POST')).body)
+assert.equal(junk.config.fx, 'fancy', '档位不在白名单里要退回原值')
+assert.equal(junk.config.festival, 'snow', '节日不在白名单里要退回原值')
+assert.equal(junk.config.birthday, '12-24', '非法生日要退回原值')
+
+const festivalOff = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ festival: 'off' })), 'POST')).body)
+assert.equal(festivalOff.festival, '', '关掉节日后今天什么都不演')
+assert.equal(festivalOff.config.fx, 'fancy', '关节日不该顺手把档位也改了')
 
 const clamped = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ speed: -5, cursor: 'yes', headline: 'x'.repeat(500) })), 'POST')).body)
 assert.equal(clamped.config.speed, 10, '速度要夹到下限')
@@ -290,10 +350,11 @@ function flatten(node, out) {
   return out
 }
 
-/** 喂一份图片状态 + 一份 hero 配置渲染设置页；传 null / undefined 就是"还没读回来"。 */
-function renderSection(state, config) {
+/** 喂一份图片状态 + 一份配置（+ 今天生效的节日）渲染设置页；传 null / undefined 就是"还没读回来"。 */
+function renderSection(state, config, festival) {
   if (state !== null) stateQueue.push(state)
   if (config !== undefined) stateQueue.push(config)
+  if (festival !== undefined) stateQueue.push(festival)
   return registrations[2]({})
 }
 
@@ -305,17 +366,28 @@ const heroState = {
   cursorChar: '|',
   hideLogo: true,
   hideBadge: true,
+  fx: 'standard',
+  forceMotion: false,
+  festival: 'auto',
+  birthday: '',
 }
 const loadedTree = flatten(renderSection({
   avatar: { custom: false, bytes: 4096 },
   bg: { custom: true, bytes: 8192, mtime: 1700000000000 },
-}, heroState), []).join(' ')
+}, heroState, ''), []).join(' ')
 assert.ok(loadedTree.includes('iframe'), '设置页要有实时预览 iframe')
 assert.ok(loadedTree.includes('src=/dsh-startup/preview'), '预览 iframe 要指向宿主的预览路由')
 assert.ok(loadedTree.includes('sandbox=allow-scripts'), '预览 iframe 必须沙箱化，别让它碰真实页面的 sessionStorage')
 assert.ok(/src=\/dsh-startup\/bg\?v=1700000000000/.test(loadedTree), '换过图的槽位预览要带 mtime 版本号')
 assert.ok(loadedTree.includes('type=file'), '两个槽位都要有选图入口')
 assert.ok(loadedTree.includes('恢复默认'), '换过图的槽位要能恢复内置默认')
+// 启动动画效果卡片：三个档位、强制动效、节日与生日都要在
+assert.ok(loadedTree.includes('启动动画效果'), '设置页要有启动动画效果卡片')
+for (const label of ['省电', '标准', '华丽', '强制播放动效', '节日特效']) {
+  assert.ok(loadedTree.includes(label), `启动动画卡片要有「${label}」`)
+}
+assert.ok(loadedTree.includes('MM-DD'), '要有生日输入框（MM-DD 提示）')
+assert.ok(loadedTree.includes('今天没有节日特效'), '没有节日时要说明今天不演')
 // 主界面标题卡片：问候语要带出来，四个开关都要在
 assert.ok(loadedTree.includes('主界面标题'), '设置页要有主界面标题卡片')
 assert.ok(loadedTree.includes('你好，我是和栗薰子，欢迎使用Deepseek Harness'), '卡片要带出当前问候语')
@@ -323,6 +395,12 @@ for (const label of ['打字机逐字显示', '闪烁光标', '隐藏标题旁�
   assert.ok(loadedTree.includes(label), `标题卡片要有「${label}」开关`)
 }
 assert.ok(loadedTree.includes('恢复默认'), '标题卡片要能恢复默认')
+// 手动选了节日时，"今天生效"要跟着变
+const snowTree = flatten(renderSection({
+  avatar: { custom: false, bytes: 4096 },
+  bg: { custom: false, bytes: 8192 },
+}, heroState, 'snow'), []).join(' ')
+assert.ok(snowTree.includes('今天生效：飘雪'), '主报告诉今天演飘雪，卡片就要这么写')
 // 配置还没读回来 / 读失败时：卡片位置留一句说明，但不许出现可编辑的输入框
 // （否则输入框会以空值初始化，用户一存盘就把配置清空了）
 const pendingTree = flatten(renderSection({
@@ -353,6 +431,11 @@ if (existsSync(distIndex)) {
   assert.ok(out.includes('<style id="dshs-wall-css">'), '壁纸样式必须注入')
   assert.ok(out.includes('<style id="dshs-hero-css">'), 'hero 改造样式必须注入（hero 在主界面才渲染，不能只放启动页那份里）')
   assert.ok(out.includes(BOOT_SRC), 'boot.js 必须注入')
+  // 档位/节日/强制动效的类要在首帧前挂上，而且必须早于早脚本 ——
+  // 早脚本在"60 秒内重复刷新"时会直接 return，但配色不该跟着一起省掉
+  assert.ok(out.includes('window.__dshsConfig='), '配置必须注入 index.html')
+  assert.ok(out.includes('dshs-fx-standard'), '默认档位类要在首帧前挂上')
+  assert.ok(out.indexOf('__dshsConfig') < out.indexOf('dshs-at'), '配置脚本要早于早脚本，跳过动画时配色也要在')
   assert.ok(out.indexOf('dshs-css') < out.indexOf('<body'), '关键样式必须落在 <head> 内')
   assert.ok(out.indexOf(BOOT_SRC) < out.indexOf('</body>'), 'boot.js 必须落在 </body> 前')
   const appScript = out.indexOf('assets/index-')
@@ -376,6 +459,8 @@ assert.ok(previewHtml.includes('<style id="dshs-css">'), '预览页要带上启�
 assert.ok(previewHtml.includes('<div id="root"></div>'), '预览页要有假主界面的挂载点')
 assert.ok(previewHtml.includes('__dshsNoRemember'), '预览页不该把真实页面的动画标记成"已播过"')
 assert.ok(previewHtml.includes('<style id="dshs-wall-css">'), '预览页要带上主界面壁纸，否则看不到收尾的交接')
+assert.ok(previewHtml.includes('window.__dshsConfig='), '预览页也要拿到配置，否则预览里看不到档位与节日的效果')
+assert.ok(previewHtml.includes('dshs-fx-'), '预览页的档位类也要在首帧前挂上')
 assert.ok(previewHtml.includes(BOOT_SRC), '预览页要引 boot.js')
 assert.ok(previewHtml.indexOf('dshs-css') < previewHtml.indexOf('<body'), '预览页的启动页样式也要落在 <head> 内')
 

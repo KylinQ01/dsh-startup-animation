@@ -5,7 +5,9 @@
    判定主界面就绪、一次切类名完成过场，最后把节点和启动页样式删干净。
    所有位移/缩放/透明度都写在 boot.css 里，且只跑 transform / translate / opacity 这类合成器属性。
 
-   想调节奏改下面五个常量；想调画面改 boot.css。 */
+   画质档位（省电/标准/华丽）与节日彩蛋都由宿主注入的 window.__dshsConfig 决定：
+   档位管"撒多少东西"和"要不要常驻循环/视差"，节日管配色（在 boot.css 里）与这一天的专属粒子。
+   想调节奏改下面那几个常量；想调画面改 boot.css。 */
 (function () {
   'use strict'
 
@@ -25,16 +27,42 @@
   var GRACE_MS = 520   // 主界面已挂载后多等一拍，等它画完再撤
   var MAX_MS = 5000    // 兜底：最多挡住主界面这么久
   var OUT_MS = 700     // 过场时长，与 boot.css 的 .is-out 保持一致
-  var PETALS = 10      // 上浮光点数量
-  var STARS = 16       // 星尘数量
-  var SPARKS = 8       // 入场时头像四周迸出的星火数量
 
-  var HELLO = '欢迎回来'
+  // 宿主在 <head> 里塞进来的配置（档位 / 节日 / 强制动效），拿不到就全用默认
+  var CONFIG = window.__dshsConfig && typeof window.__dshsConfig === 'object' ? window.__dshsConfig : {}
+  var FX = CONFIG.fx === 'eco' || CONFIG.fx === 'fancy' ? CONFIG.fx : 'standard'
+  var FESTIVAL = typeof CONFIG.festivalActive === 'string' ? CONFIG.festivalActive : ''
+
+  /* 画质档位决定"撒多少东西"：省电档还额外关掉常驻循环与指针视差（见 follow 与 boot.css）。
+     粒子数量直接等于绘制量，所以这是最划算的一档开关。
+     节日在档位基础上再加一层：樱花多撒花瓣、新年多迸星火、飘雪与生日换成自己的粒子。 */
+  var COUNTS = {
+    eco: { stars: 8, petals: 0, sparks: 6 },
+    standard: { stars: 16, petals: 10, sparks: 8 },
+    fancy: { stars: 30, petals: 16, sparks: 12 },
+  }
+  var TIER = COUNTS[FX]
+  var STARS = TIER.stars
+  var PETALS = TIER.petals
+  var SPARKS = TIER.sparks
+  if (FESTIVAL === 'sakura') PETALS += 8
+  if (FESTIVAL === 'snow') PETALS = 0              // 下雪天就别再飘花瓣了，两种粒子一起飞很乱
+  if (FESTIVAL === 'newyear') SPARKS += 6
+  var SNOW = FESTIVAL === 'snow' ? 18 : 0        // 飘雪：从上往下落
+  var CONFETTI = FESTIVAL === 'birthday' ? 14 : 0 // 生日：彩色纸屑
+
+  // 节日顺手改一句问候：打开软件那一下就知道"今天有彩蛋"
+  var HELLO = FESTIVAL === 'birthday' ? '生日快乐' : (FESTIVAL === 'newyear' ? '新年快乐' : '欢迎回来')
   var TIP = '正在准备你的工作台'
 
-  // 系统开了"减少动态效果"就只保留入场与过场，不做常驻循环与视差
+  // 系统开了"减少动态效果"就只保留入场与过场，不做常驻循环与视差；
+  // 设置里显式勾了"强制播放动效"就以用户的意愿为准（Windows 的动画开关会连带影响这里）。
+  // 算完再把结果镜像成 html.dshs-motion：CSS 里那些"华丽档才有的常驻循环"靠它把关 ——
+  // 光靠媒体查询挡不住，华丽档的选择器优先级更高，会把 reduce 那条压过去。
   var calm = false
   try { calm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) } catch (err) {}
+  if (CONFIG.forceMotion === true) calm = false
+  html.classList.toggle('dshs-motion', !calm)
 
   var startedAt = Date.now()
   var splash = null
@@ -72,10 +100,13 @@
       // 背景单独一层，且刻意不留富余：盒子就是视口，取景因此和主界面壁纸逐像素对齐
       '<div class="dshs-bg"><img src="/dsh-startup/bg" alt=""></div>' +
       // 远景装饰：极光色块 + 星尘 + 上浮光点 + 掠过流星 + 斜向光带
+      // 节日自己的粒子（飘雪/纸屑）只在这一天挂进 DOM —— 平时连这两个空盒子都不建
       '<div class="dshs-world">' +
         '<div class="dshs-aurora"><i></i><i></i></div>' +
         '<div class="dshs-stars"></div>' +
         '<div class="dshs-petals"></div>' +
+        (SNOW > 0 ? '<div class="dshs-snow"></div>' : '') +
+        (CONFETTI > 0 ? '<div class="dshs-confetti"></div>' : '') +
         '<div class="dshs-streaks"><i></i><i></i></div>' +
         '<div class="dshs-sheen"></div>' +
       '</div>' +
@@ -104,6 +135,8 @@
     scatterStars(box.querySelector('.dshs-stars'))
     scatterPetals(box.querySelector('.dshs-petals'))
     scatterSparks(box.querySelector('.dshs-sparks'))
+    if (SNOW > 0) scatterSnow(box.querySelector('.dshs-snow'))
+    if (CONFETTI > 0) scatterConfetti(box.querySelector('.dshs-confetti'))
     return box
   }
 
@@ -163,12 +196,53 @@
     }
   }
 
+  /** 飘雪（冬季彩蛋）：从上往下落，横向慢慢偏，和"上浮光点"正好反向。 */
+  function scatterSnow(host) {
+    if (calm) return
+    for (var i = 0; i < SNOW; i++) {
+      var size = 3 + Math.random() * 5
+      var flake = doc.createElement('i')
+      flake.className = 'dshs-snow'
+      flake.style.cssText =
+        'left:' + (Math.random() * 100).toFixed(2) + '%;' +
+        'width:' + size.toFixed(1) + 'px;' +
+        'height:' + size.toFixed(1) + 'px;' +
+        'animation-duration:' + (8 + Math.random() * 7).toFixed(1) + 's;' +
+        'animation-delay:' + (-Math.random() * 12).toFixed(1) + 's;' +
+        '--dshs-drift:' + (Math.random() * 10 - 5).toFixed(1) + 'vmin;' +
+        '--dshs-spin:' + (Math.random() * 360).toFixed(0) + 'deg;'
+      host.appendChild(flake)
+    }
+  }
+
+  /** 生日彩蛋：彩色纸屑，边落边翻，颜色和大小都随机。 */
+  function scatterConfetti(host) {
+    if (calm) return
+    var colors = ['#f6b8cd', '#b9a4e6', '#ffd479', '#8fd6c8', '#ff9f7f']
+    for (var i = 0; i < CONFETTI; i++) {
+      var width = 5 + Math.random() * 5
+      var piece = doc.createElement('i')
+      piece.className = 'dshs-confetti'
+      piece.style.cssText =
+        'left:' + (Math.random() * 100).toFixed(2) + '%;' +
+        'width:' + width.toFixed(1) + 'px;' +
+        'height:' + (width * 1.7).toFixed(1) + 'px;' +
+        'background:' + colors[i % colors.length] + ';' +
+        'animation-duration:' + (7 + Math.random() * 6).toFixed(1) + 's;' +
+        'animation-delay:' + (-Math.random() * 11).toFixed(1) + 's;' +
+        '--dshs-drift:' + (Math.random() * 14 - 7).toFixed(1) + 'vmin;' +
+        '--dshs-spin:' + (360 + Math.random() * 540).toFixed(0) + 'deg;'
+      host.appendChild(piece)
+    }
+  }
+
   /**
    * 指针视差：只把归一化坐标写进 --dshs-px / --dshs-py，各层在 CSS 里按自己的深度换算成位移。
    * 每帧最多写一次，且只改自定义属性，不触碰布局。触屏拖动不参与（会抖）。
+   * 省电档整个不要：跟着指针动的那层暖光是全屏里最吃填充率的一项，而且每次移动都要重画。
    */
   function follow() {
-    if (calm) return
+    if (calm || FX === 'eco') return
     window.addEventListener('pointermove', function (event) {
       if (event.pointerType === 'touch') return
       var w = window.innerWidth || 1

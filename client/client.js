@@ -43,6 +43,56 @@ window.__ModuleLoader__.load({
       hideBadge: '隐藏「预览版」徽章',
     }
 
+    /** 画质档位：值 → 按钮文案 + 一句话说明（说明直接写在卡片上，省得用户猜）。 */
+    const FX_TIERS = [
+      {
+        id: 'eco',
+        label: '省电',
+        hint: '星尘最少、不撒光点、极光不漂移，也不要指针视差与跟随暖光。核显 / 老机器首选。',
+      },
+      {
+        id: 'standard',
+        label: '标准',
+        hint: '目前的默认画面：纯合成器动效，帧间隔中位数已经砍到 33ms 的那一版。',
+      },
+      {
+        id: 'fancy',
+        label: '华丽',
+        hint: '把全屏模糊、极光缩放、暗角呼吸、头像推近与更多粒子加回来。机器够好再选。',
+      },
+    ]
+
+    /** 节日彩蛋：auto 跟随日期窗口，其余是手动指定（手动主要给"想现在看看"用）。 */
+    const FESTIVALS = [
+      { id: 'auto', label: '跟随日期（自动）' },
+      { id: 'off', label: '关闭' },
+      { id: 'sakura', label: '樱花季' },
+      { id: 'snow', label: '飘雪' },
+      { id: 'newyear', label: '新年' },
+      { id: 'birthday', label: '生日' },
+    ]
+    const FESTIVAL_LABEL = { sakura: '樱花季', snow: '飘雪', newyear: '新年', birthday: '生日' }
+    const FESTIVAL_WINDOWS = '自动窗口：樱花 3/20~4/20 · 飘雪 12/1~2/15 · 新年 1/1~1/3 · 生日按你填的日期'
+
+    /** 改了档位/强制动效要立刻反映在页面上（节日配色只在启动页里用，页面上的类刷新后由宿主注入的脚本接手）。 */
+    function applySplashClasses(config) {
+      const el = document.documentElement
+      for (const tier of FX_TIERS) el.classList.toggle('dshs-fx-' + tier.id, config.fx === tier.id)
+      el.classList.toggle('dshs-force-motion', config.forceMotion === true)
+    }
+
+    /** 两张配置卡片共用的存盘动作：POST 一份局部配置，返回宿主校验后的完整配置。 */
+    async function saveConfig(body) {
+      const answered = await fetch('/dsh-startup/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await answered.json()
+      if (!data.ok) throw new Error(data.error || '保存失败')
+      return data
+    }
+
     const styles = {
       page: { maxWidth: 660, fontSize: 13, color: 'var(--dsw-alias-label-primary, #22303f)' },
       lead: { margin: '0 0 16px', color: 'var(--dsw-alias-label-secondary, #55617a)', lineHeight: 1.7 },
@@ -181,6 +231,12 @@ window.__ModuleLoader__.load({
       }).join('-')
     }
 
+    /** 档位/节日/强制动效也进预览的 key：改完这几项，预览小窗同样要重放一遍。 */
+    function splashStamp(config) {
+      if (!config) return 'none'
+      return [config.fx, config.festival, config.birthday, config.forceMotion ? 'force' : 'calm'].join('_')
+    }
+
     /** 实时预览：宿主把预览页渲染成自包含文档，这里只负责挂载与重播。 */
     function Preview(props) {
       const [nonce, setNonce] = useState(0)
@@ -210,14 +266,121 @@ window.__ModuleLoader__.load({
         // 也不会把脚本能力带进设置页。
         ready
           ? h('iframe', {
-            key: stamp(props.state) + '-' + nonce,
+            key: stamp(props.state) + '-' + splashStamp(props.config) + '-' + nonce,
             style: styles.frame,
             src: '/dsh-startup/preview',
             sandbox: 'allow-scripts',
             title: '启动动画预览',
           })
           : h('div', { key: 'idle', style: Object.assign({}, styles.frame, styles.frameIdle) }, '正在读取图片状态…'),
-        h('p', { key: 'hint', style: styles.hint }, '换完图这里会自动重放一遍；「新标签打开」可放大看。预览里跑的启动动画与真实开机时完全同一份代码。'),
+        h('p', { key: 'hint', style: styles.hint }, '换完图、改完档位或节日，这里会自动重放一遍；「新标签打开」可放大看。预览里跑的启动动画与真实开机时完全同一份代码。'),
+      ])
+    }
+
+    /**
+     * 「启动动画效果」卡片：画质档位 + 强制动效 + 节日彩蛋。
+     * 档位与强制动效存盘后立刻挂到 <html> 上；节日配色只用在启动页，刷新后由宿主注入的类接手。
+     */
+    function SplashCard(props) {
+      const [draft, setDraft] = useState(props.config)
+      const [busy, setBusy] = useState(false)
+      const [error, setError] = useState(null)
+      const [saved, setSaved] = useState(false)
+
+      function patch(key, value) {
+        setDraft(Object.assign({}, draft, { [key]: value }))
+        setSaved(false)
+      }
+
+      async function save(body) {
+        setBusy(true)
+        setError(null)
+        try {
+          const data = await saveConfig(body)
+          setDraft(data.config)
+          setSaved(true)
+          props.onSaved(data.config, data.festival)
+        } catch (err) {
+          setError(err && err.message ? err.message : String(err))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const tier = FX_TIERS.filter((item) => item.id === draft.fx)[0] || FX_TIERS[1]
+      const today = props.festival
+
+      return h('div', { style: styles.formCard }, [
+        h('p', { key: 'title', style: styles.title }, '启动动画效果'),
+        h('p', { key: 'hint', style: styles.hint },
+          '画质档位决定开机那两秒撒多少东西；节日彩蛋跟着日期自动换配色与粒子。改完刷新页面，下次播放就是新画面。'),
+        h('label', { key: 'fxLabel', style: styles.label }, '画质档位'),
+        h('div', { key: 'fx', style: styles.row }, FX_TIERS.map((item) => h('button', {
+          key: item.id,
+          type: 'button',
+          disabled: busy,
+          style: draft.fx === item.id
+            ? Object.assign({}, styles.primary, busy ? styles.busy : null)
+            : Object.assign({}, styles.ghost, busy ? styles.busy : null),
+          onClick: () => patch('fx', item.id),
+        }, item.label))),
+        h('p', { key: 'fxHint', style: Object.assign({}, styles.hint, { marginTop: 8 }) }, tier.hint),
+        h('div', { key: 'motion', style: styles.checks }, [
+          h('label', { key: 'force', style: styles.check }, [
+            h('input', {
+              key: 'box',
+              type: 'checkbox',
+              checked: draft.forceMotion === true,
+              disabled: busy,
+              onChange: (event) => patch('forceMotion', event.target.checked),
+            }),
+            '强制播放动效',
+          ]),
+        ]),
+        h('p', { key: 'motionHint', style: styles.hint },
+          '勾上它，即使系统开着「减少动态效果」（Windows 的「辅助功能 → 视觉效果 → 动画效果」关了就会这样），星尘、极光、视差也照播。'),
+        h('div', { key: 'fest', style: Object.assign({}, styles.row, { marginTop: 14 }) }, [
+          h('label', { key: 'festLabel', style: Object.assign({}, styles.label, { margin: 0 }) }, '节日特效'),
+          h('select', {
+            key: 'festSelect',
+            style: styles.input,
+            value: draft.festival,
+            disabled: busy,
+            onChange: (event) => patch('festival', event.target.value),
+          }, FESTIVALS.map((item) => h('option', { key: item.id, value: item.id }, item.label))),
+          h('label', { key: 'bLabel', style: Object.assign({}, styles.label, { margin: '0 0 0 8px' }) }, '生日'),
+          h('input', {
+            key: 'birthday',
+            type: 'text',
+            placeholder: 'MM-DD',
+            maxLength: 5,
+            style: Object.assign({}, styles.input, { width: 84 }),
+            value: draft.birthday,
+            disabled: busy,
+            onChange: (event) => patch('birthday', event.target.value),
+          }),
+        ]),
+        h('p', { key: 'today', style: Object.assign({}, styles.hint, { marginTop: 8 }) },
+          today ? `今天生效：${FESTIVAL_LABEL[today] || today}` : '今天没有节日特效'),
+        h('p', { key: 'windows', style: styles.hint }, FESTIVAL_WINDOWS, '；生日留空＝不启用。'),
+        h('div', { key: 'acts', style: Object.assign({}, styles.row, { marginTop: 14 }) }, [
+          h('button', {
+            key: 'save',
+            type: 'button',
+            style: busy ? Object.assign({}, styles.primary, styles.busy) : styles.primary,
+            disabled: busy,
+            onClick: () => save(draft),
+          }, busy ? '保存中…' : '保存并生效'),
+          h('button', {
+            key: 'reset',
+            type: 'button',
+            style: busy ? Object.assign({}, styles.ghost, styles.busy) : styles.ghost,
+            disabled: busy,
+            onClick: () => save({ reset: true }),
+          }, '恢复默认'),
+          saved ? h('span', { key: 'ok', style: styles.ok }, '已生效 ✓') : null,
+        ]),
+        error ? h('p', { key: 'err', style: styles.err }, error) : null,
       ])
     }
 
@@ -240,13 +403,7 @@ window.__ModuleLoader__.load({
         setBusy(true)
         setError(null)
         try {
-          const answered = await fetch('/dsh-startup/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-          const data = await answered.json()
-          if (!data.ok) throw new Error(data.error || '保存失败')
+          const data = await saveConfig(body)
           setDraft(data.config)
           setSaved(true)
           props.onSaved(data.config)
@@ -433,6 +590,7 @@ window.__ModuleLoader__.load({
       const [state, setState] = useState(null)
       // undefined = 还在读；null = 读失败；对象 = 读到了（失败也占着卡片位置，好让用户知道为什么改不了）
       const [config, setConfig] = useState(undefined)
+      const [festival, setFestival] = useState('')
       const [error, setError] = useState(null)
 
       React.useEffect(() => {
@@ -444,7 +602,14 @@ window.__ModuleLoader__.load({
           .catch((err) => { if (alive) setError(err && err.message ? err.message : String(err)) })
         fetch('/dsh-startup/config')
           .then((answered) => answered.json())
-          .then((data) => { if (alive) setConfig(data && data.ok === true ? data.config : null) })
+          .then((data) => {
+            if (!alive) return
+            setConfig(data && data.ok === true ? data.config : null)
+            if (data && data.ok === true) {
+              setFestival(typeof data.festival === 'string' ? data.festival : '')
+              applySplashClasses(data.config)
+            }
+          })
           .catch(() => { if (alive) setConfig(null) })
         return () => { alive = false }
       }, [])
@@ -461,12 +626,20 @@ window.__ModuleLoader__.load({
         heroApply(next, true)
       }
 
+      /** 启动动画那边：档位与强制动效立刻挂到 <html> 上，节日只更新"今天"的显示。 */
+      function splashSaved(next, today) {
+        setConfig(next)
+        setFestival(today || '')
+        applySplashClasses(next)
+      }
+
       return h('div', { style: styles.page, 'data-dshs-ui': '' }, [
         h('p', { key: 'lead', style: styles.lead },
           '换掉打开软件时的启动动画、主界面壁纸，以及主界面新会话那句标题。',
           '图片支持 PNG / JPEG / WebP / GIF，单张上限 12MB；点「选择图片」或直接把图拖到卡片上，',
           '换完上面的预览会自动重放一遍。'),
-        h(Preview, { key: 'preview', state: state }),
+        h(Preview, { key: 'preview', state: state, config: config || undefined }),
+        config ? h(SplashCard, { key: 'splash', config: config, festival: festival, onSaved: splashSaved }) : null,
         config ? h(HeroCard, { key: 'hero', config: config, onSaved: heroSaved }) : h('div', { key: 'hero', style: styles.formCard }, [
           h('p', { key: 'title', style: styles.title }, '主界面标题'),
           h('p', { key: 'hint', style: styles.hint }, config === null
