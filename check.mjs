@@ -282,6 +282,22 @@ const junk = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify
 assert.equal(junk.config.fx, 'fancy', '档位不在白名单里要退回原值')
 assert.equal(junk.config.festival, 'snow', '节日不在白名单里要退回原值')
 assert.equal(junk.config.birthday, '12-24', '非法生日要退回原值')
+assert.ok(typeof junk.warning === 'string' && junk.warning.includes('没看懂'), '生日看不懂必须提示（以前静默丢弃，用户以为"保存不了"）')
+
+// 生日写法要吃得宽：真实反馈里用户敲的是 2-14 这种，只认严格 MM-DD 会静默失败
+for (const [typed, expected] of [
+  ['02-14', '02-14'], ['2-14', '02-14'], ['2/14', '02-14'], ['2.14', '02-14'],
+  ['2月14日', '02-14'], ['0214', '02-14'], ['1224', '12-24'],
+  ['2026-12-24', '12-24'], ['  12-24  ', '12-24'], ['0229', '02-29'],
+]) {
+  const parsed = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ birthday: typed })), 'POST')).body)
+  assert.equal(parsed.config.birthday, expected, `生日「${typed}」应解析成 ${expected}`)
+  assert.equal(parsed.warning, undefined, `生日「${typed}」看得懂，不该报警告`)
+}
+const beforeBad = (await readConfig()).birthday
+const badBirthday = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ birthday: '2月' })), 'POST')).body)
+assert.equal(badBirthday.config.birthday, beforeBad, '看不懂的生日不能覆盖已有值')
+assert.ok(badBirthday.warning.includes('MM-DD'), '提示里要说清楚该怎么填')
 
 const festivalOff = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ festival: 'off' })), 'POST')).body)
 assert.equal(festivalOff.festival, '', '关掉节日后今天什么都不演')
@@ -403,6 +419,8 @@ for (const label of ['省电', '标准', '华丽', '强制播放动效', '节日
   assert.ok(loadedTree.includes(label), `启动动画卡片要有「${label}」`)
 }
 assert.ok(loadedTree.includes('MM-DD'), '要有生日输入框（MM-DD 提示）')
+assert.ok(loadedTree.includes('maxLength=10'), '生日输入框要放得下 2026-12-24（maxLength 不能卡在 5）')
+assert.ok(loadedTree.includes('2月14日'), '卡片上要写清生日认哪些写法')
 assert.ok(loadedTree.includes('今天没有节日特效'), '没有节日时要说明今天不演')
 // 60 秒内刷新会整段跳过动画，而"看效果"恰恰靠刷新 —— 卡片上必须给一个明确的重播入口
 assert.ok(loadedTree.includes('现在重播一次'), '启动动画卡片要有「现在重播一次」按钮')

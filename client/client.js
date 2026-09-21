@@ -286,20 +286,29 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState(props.config)
       const [busy, setBusy] = useState(false)
       const [error, setError] = useState(null)
+      const [warn, setWarn] = useState(null)
       const [saved, setSaved] = useState(false)
 
       function patch(key, value) {
         setDraft(Object.assign({}, draft, { [key]: value }))
         setSaved(false)
+        setWarn(null)
       }
 
       async function save(body) {
         setBusy(true)
         setError(null)
+        setWarn(null)
         try {
           const data = await saveConfig(body)
-          setDraft(data.config)
-          setSaved(true)
+          if (data.warning) {
+            // 有一项没被接受时**不要**用返回值刷新草稿：那会把用户刚敲的生日冲掉，
+            // 看起来就是"保存了但输入框自己变空"。留着让他改，并把原因写在下面。
+            setWarn(data.warning)
+          } else {
+            setDraft(data.config)
+            setSaved(true)
+          }
           props.onSaved(data.config, data.festival)
         } catch (err) {
           setError(err && err.message ? err.message : String(err))
@@ -354,8 +363,10 @@ window.__ModuleLoader__.load({
             key: 'birthday',
             type: 'text',
             placeholder: 'MM-DD',
-            maxLength: 5,
-            style: Object.assign({}, styles.input, { width: 84 }),
+            // 放宽到 10：`2026-12-24` 这种带年份的写法也要能敲进去（宿主会取月日）
+            maxLength: 10,
+            inputMode: 'numeric',
+            style: Object.assign({}, styles.input, { width: 96 }),
             value: draft.birthday,
             disabled: busy,
             onChange: (event) => patch('birthday', event.target.value),
@@ -365,6 +376,8 @@ window.__ModuleLoader__.load({
           today ? `今天生效：${FESTIVAL_LABEL[today] || today}` : '今天没有节日特效'),
         h('p', { key: 'windows', style: styles.hint }, FESTIVAL_WINDOWS),
         h('p', { key: 'manual', style: styles.hint }, FESTIVAL_MANUAL),
+        h('p', { key: 'birthdayHint', style: styles.hint },
+          '生日写法很随意：02-14、2-14、2/14、2月14日、0214、2026-12-24 都认，存完会统一显示成 02-14。'),
         h('p', { key: 'replayHint', style: styles.hint },
           '看效果最快的办法：存盘后点「现在重播一次」。普通刷新在 60 秒内会整段跳过动画（免得自动重载一直演），存盘时我会顺手清掉那个标记。'),
         h('div', { key: 'acts', style: Object.assign({}, styles.row, { marginTop: 14 }) }, [
@@ -390,6 +403,7 @@ window.__ModuleLoader__.load({
           }, '现在重播一次'),
           saved ? h('span', { key: 'ok', style: styles.ok }, '已生效 ✓') : null,
         ]),
+        warn ? h('p', { key: 'warn', style: styles.err }, warn) : null,
         error ? h('p', { key: 'err', style: styles.err }, error) : null,
       ])
     }
