@@ -1,0 +1,34 @@
+/* 主界面 hero 的改造样式（标题打字机 + 光标闪烁 + 摘掉 logo/徽章）。
+   宿主把它常驻注入 index.html —— 不能放进 boot.css：那份样式在启动页收尾时会被整段移除，
+   而主界面 hero 恰恰是在那之后才渲染的。类名统一带 dshs-hero- 前缀，不给主界面留同名冲突。
+
+   元素是 client.js 找出来的（按结构找，不认哈希类名）：
+     .sro9dq_headline
+       ├─ span(鲸鱼 svg)          ← 加 .dshs-hero-hide
+       └─ .sro9dq_titleGroup
+            ├─ span(标题)          ← 加 .dshs-hero-typed，光标由它的 ::after 画
+            └─ .sro9dq_previewBadge ← 加 .dshs-hero-hide */
+
+.dshs-hero-hide { display: none !important; }
+
+/* 光标：挂在标题 span 的 ::after 上，而不是往 React 的树里插一个节点 ——
+   插进去的节点会在组件重渲染时被 React 抹掉，::after 不参与 diff，安全得多。
+   字符由 client.js 写进 --dshs-hero-cursor（它跟着配置走）。 */
+.dshs-hero-typed::after {
+  content: var(--dshs-hero-cursor, "|");
+  margin-left: 3px;
+  font-weight: 400;
+  opacity: .8;
+  animation: dshs-hero-blink 1.05s step-end infinite;
+}
+
+@keyframes dshs-hero-blink {
+  0%, 45% { opacity: .8; }
+  50%, 95% { opacity: 0; }
+  100% { opacity: .8; }
+}
+
+/* 系统开了「减少动态效果」就让它常亮，别一闪一闪的。 */
+@media (prefers-reduced-motion: reduce) {
+  .dshs-hero-typed::after { animation: none; opacity: .8; }
+}

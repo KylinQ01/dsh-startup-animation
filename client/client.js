@@ -1,13 +1,15 @@
-/* dsh-startup-animation 的网页半边：在「设置」里加一页，让用户自己换启动页头像与背景图。
+/* dsh-startup-animation 的网页半边：在「设置」里加一页，管启动页头像/背景图，以及主界面 hero 的标题。
  *
  * 手写、不打构建：整包就是 window.__ModuleLoader__ 的一个 factory，只 require 平台种子模块里的 react。
- * 交互只走本插件自己的 HTTP 路由（/dsh-startup/images…、/dsh-startup/preview），不占 DSH 的 RPC 通道。
+ * 交互只走本插件自己的 HTTP 路由（/dsh-startup/images…、/dsh-startup/config、/dsh-startup/preview），
+ * 不占 DSH 的 RPC 通道。
  *
  * 页面结构：顶上是一块实时预览（把宿主的预览页塞进 sandbox iframe，换图即重放），
- * 下面两张卡片分别管头像与背景图（点选或拖拽上传、可恢复内置默认图）。
+ * 然后是「主界面标题」卡片（问候语 / 打字机 / 光标 / 隐藏 logo 与预览版徽章），
+ * 最后两张卡片分别管头像与背景图（点选或拖拽上传、可恢复内置默认图）。
  *
- * 除设置页外还顺手做一件事：把主界面新会话标题「探索未至之境」改写成自定义问候语
- * （见下面的 HEADLINE_FROM / HEADLINE_TO，改文案由客户端 HMR 热更，不用重启宿主）。
+ * 设置页之外还顺手改造主界面 hero：把新会话标题「探索未至之境」换成可配置的问候语并逐字打出来，
+ * 同时摘掉标题左边的鲸鱼 logo 与右边的「预览版」徽章（见下面的 hero* 函数）。
  */
 window.__ModuleLoader__.load({
   id: 'dsh-startup-animation',
@@ -32,6 +34,14 @@ window.__ModuleLoader__.load({
         hint: '启动动画的背景，同时也是主界面壁纸；建议横图，界面里会按 cover 铺满。',
       },
     ]
+
+    /** 「主界面标题」卡片上的四个开关：配置字段名 → 显示文案。 */
+    const CHECK_LABELS = {
+      typewriter: '打字机逐字显示',
+      cursor: '闪烁光标',
+      hideLogo: '隐藏标题旁的 logo',
+      hideBadge: '隐藏「预览版」徽章',
+    }
 
     const styles = {
       page: { maxWidth: 660, fontSize: 13, color: 'var(--dsw-alias-label-primary, #22303f)' },
@@ -115,6 +125,39 @@ window.__ModuleLoader__.load({
       drop: { outline: '2px dashed var(--dsw-alias-brand-primary, #4f6ef7)', outlineOffset: 2 },
       foot: { margin: '18px 0 0', color: 'var(--dsw-alias-label-tertiary, #8b93a1)', lineHeight: 1.7 },
       mono: { background: 'var(--dsw-alias-bg-layer-2, #f3f4f6)', borderRadius: 4, padding: '1px 4px' },
+      formCard: {
+        padding: 16,
+        marginBottom: 14,
+        background: 'var(--dsw-alias-bg-layer-1, #fff)',
+        border: '1px solid var(--dsw-alias-border-l2, #e5e7eb)',
+        borderRadius: 12,
+      },
+      label: { display: 'block', margin: '0 0 6px', color: 'var(--dsw-alias-label-tertiary, #8b93a1)' },
+      input: {
+        font: 'inherit',
+        height: 32,
+        padding: '0 10px',
+        boxSizing: 'border-box',
+        borderRadius: 8,
+        border: '1px solid var(--dsw-alias-border-l2, #d1d5db)',
+        background: 'var(--dsw-alias-bg-layer-1, #fff)',
+        color: 'inherit',
+      },
+      area: {
+        font: 'inherit',
+        width: '100%',
+        minHeight: 58,
+        padding: '8px 10px',
+        boxSizing: 'border-box',
+        resize: 'vertical',
+        borderRadius: 8,
+        border: '1px solid var(--dsw-alias-border-l2, #d1d5db)',
+        background: 'var(--dsw-alias-bg-layer-1, #fff)',
+        color: 'inherit',
+      },
+      checks: { display: 'flex', flexWrap: 'wrap', gap: '8px 16px', margin: '14px 0 0' },
+      check: { display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
+      ok: { margin: '10px 0 0', color: 'var(--dsw-alias-state-success-primary, #16a34a)' },
     }
 
     function describe(state) {
@@ -175,6 +218,119 @@ window.__ModuleLoader__.load({
           })
           : h('div', { key: 'idle', style: Object.assign({}, styles.frame, styles.frameIdle) }, '正在读取图片状态…'),
         h('p', { key: 'hint', style: styles.hint }, '换完图这里会自动重放一遍；「新标签打开」可放大看。预览里跑的启动动画与真实开机时完全同一份代码。'),
+      ])
+    }
+
+    /**
+     * 「主界面标题」卡片：改问候语、打字机、光标与两处隐藏开关。
+     * 存盘后立刻回调 onSaved，主界面那边会拿新配置重放一遍（不用刷新就能看到）。
+     */
+    function HeroCard(props) {
+      const [draft, setDraft] = useState(props.config)
+      const [busy, setBusy] = useState(false)
+      const [error, setError] = useState(null)
+      const [saved, setSaved] = useState(false)
+
+      function patch(key, value) {
+        setDraft(Object.assign({}, draft, { [key]: value }))
+        setSaved(false)
+      }
+
+      async function save(body) {
+        setBusy(true)
+        setError(null)
+        try {
+          const answered = await fetch('/dsh-startup/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          const data = await answered.json()
+          if (!data.ok) throw new Error(data.error || '保存失败')
+          setDraft(data.config)
+          setSaved(true)
+          props.onSaved(data.config)
+        } catch (err) {
+          setError(err && err.message ? err.message : String(err))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      function toggle(key) {
+        return h('label', { key, style: styles.check }, [
+          h('input', {
+            key: 'box',
+            type: 'checkbox',
+            checked: draft[key] === true,
+            disabled: busy,
+            onChange: (event) => patch(key, event.target.checked),
+          }),
+          CHECK_LABELS[key],
+        ])
+      }
+
+      return h('div', { style: styles.formCard }, [
+        h('p', { key: 'title', style: styles.title }, '主界面标题'),
+        h('p', { key: 'hint', style: styles.hint },
+          '新会话空状态那句标题（原来是「探索未至之境」）。存盘后立刻在主界面生效，不用刷新。'),
+        h('label', { key: 'headline', style: styles.label }, '问候语'),
+        h('textarea', {
+          key: 'text',
+          style: styles.area,
+          value: draft.headline,
+          disabled: busy,
+          onChange: (event) => patch('headline', event.target.value),
+        }),
+        h('div', { key: 'checks', style: styles.checks }, [
+          toggle('typewriter'),
+          toggle('cursor'),
+          toggle('hideLogo'),
+          toggle('hideBadge'),
+        ]),
+        h('div', { key: 'tuning', style: Object.assign({}, styles.row, { marginTop: 14 }) }, [
+          h('label', { key: 'speedLabel', style: Object.assign({}, styles.label, { margin: 0 }) }, '每字间隔'),
+          h('input', {
+            key: 'speed',
+            type: 'number',
+            min: 10,
+            max: 1000,
+            step: 10,
+            style: Object.assign({}, styles.input, { width: 84 }),
+            value: draft.speed,
+            disabled: busy || draft.typewriter !== true,
+            onChange: (event) => patch('speed', Number(event.target.value)),
+          }),
+          h('span', { key: 'unit', style: styles.hint }, '毫秒'),
+          h('label', { key: 'charLabel', style: Object.assign({}, styles.label, { margin: '0 0 0 8px' }) }, '光标字符'),
+          h('input', {
+            key: 'char',
+            type: 'text',
+            maxLength: 4,
+            style: Object.assign({}, styles.input, { width: 64 }),
+            value: draft.cursorChar,
+            disabled: busy || draft.cursor !== true,
+            onChange: (event) => patch('cursorChar', event.target.value),
+          }),
+        ]),
+        h('div', { key: 'acts', style: Object.assign({}, styles.row, { marginTop: 14 }) }, [
+          h('button', {
+            key: 'save',
+            type: 'button',
+            style: busy ? Object.assign({}, styles.primary, styles.busy) : styles.primary,
+            disabled: busy,
+            onClick: () => save(draft),
+          }, busy ? '保存中…' : '保存并生效'),
+          h('button', {
+            key: 'reset',
+            type: 'button',
+            style: busy ? Object.assign({}, styles.ghost, styles.busy) : styles.ghost,
+            disabled: busy,
+            onClick: () => save({ reset: true }),
+          }, '恢复默认'),
+          saved ? h('span', { key: 'ok', style: styles.ok }, '已生效 ✓') : null,
+        ]),
+        error ? h('p', { key: 'err', style: styles.err }, error) : null,
       ])
     }
 
@@ -275,13 +431,20 @@ window.__ModuleLoader__.load({
 
     function SettingsSection() {
       const [state, setState] = useState(null)
+      const [config, setConfig] = useState(null)
       const [error, setError] = useState(null)
 
       React.useEffect(() => {
         let alive = true
-        fetch('/dsh-startup/images')
-          .then((answered) => answered.json())
-          .then((data) => { if (alive) setState(data) })
+        Promise.all([
+          fetch('/dsh-startup/images').then((answered) => answered.json()),
+          fetch('/dsh-startup/config').then((answered) => answered.json()),
+        ])
+          .then(([images, hero]) => {
+            if (!alive) return
+            setState(images)
+            if (hero && hero.ok === true) setConfig(hero.config)
+          })
           .catch((err) => { if (alive) setError(err && err.message ? err.message : String(err)) })
         return () => { alive = false }
       }, [])
@@ -292,11 +455,19 @@ window.__ModuleLoader__.load({
         location.reload()
       }
 
+      /** 存盘后主界面那边立刻重放：不用刷新就能看到新文案/新开关的效果。 */
+      function heroSaved(next) {
+        setConfig(next)
+        heroApply(next, true)
+      }
+
       return h('div', { style: styles.page }, [
         h('p', { key: 'lead', style: styles.lead },
-          '换掉打开软件时的启动动画与主界面壁纸。支持 PNG / JPEG / WebP / GIF，单张上限 12MB；',
-          '点「选择图片」或直接把图拖到卡片上，换完上面的预览会自动重放一遍。'),
+          '换掉打开软件时的启动动画、主界面壁纸，以及主界面新会话那句标题。',
+          '图片支持 PNG / JPEG / WebP / GIF，单张上限 12MB；点「选择图片」或直接把图拖到卡片上，',
+          '换完上面的预览会自动重放一遍。'),
         h(Preview, { key: 'preview', state: state }),
+        config ? h(HeroCard, { key: 'hero', config: config, onSaved: heroSaved }) : null,
         ...SLOTS.map((item) => h(SlotCard, {
           key: item.slot,
           slot: item.slot,
@@ -323,47 +494,157 @@ window.__ModuleLoader__.load({
       ])
     }
 
-    /* 主界面标题改写：新会话 hero 的「探索未至之境」来自会话组件内置的 i18n 字典
-     * （hero.headline），槽位机制拿不到字典，所以用 MutationObserver 直接改文本节点——
-     * React 重挂载（切新会话）会按字典重新渲染出原文，观察器会再把它改回来。
-     * 自检脚本会在没有 DOM 的 vm 沙箱里执行 apply，所以这里要按环境跳过。 */
-    const HEADLINE_FROM = '探索未至之境'
-    const HEADLINE_TO = '你好，我是和栗薰子，欢迎使用Deepseek Harness'
+    /* ── 主界面 hero 改造 ────────────────────────────────────────────────
+     * 新会话那句标题来自会话组件内置的 i18n 字典（hero.headline），槽位机制碰不到字典，
+     * 所以直接在 DOM 上做，四件事：
+     *   · 标题换成配置里的问候语，逐字打出来（打字机）；
+     *   · 光标用 CSS 的 ::after 画，不往 React 的树里插节点——插进去会被重渲染抹掉；
+     *   · 摘掉标题左边的鲸鱼 logo 与右边的「预览版」徽章（按结构找，不认哈希类名）；
+     *   · 文案/速度/开关都来自 /dsh-startup/config，设置页存盘后立刻重放。
+     * React 重挂载（切新会话）会按字典把原文渲染回来，观察器会再接管一次。
+     * 自检脚本在没有 DOM 的 vm 沙箱里执行 apply，所以这里按环境跳过。 */
+    const HERO_FROM = '探索未至之境'
+    const HERO_MARK = 'data-dshs-hero'
+    const HERO_HIDE = 'dshs-hero-hide'
+    const HERO_TYPED = 'dshs-hero-typed'
+    const HERO_FALLBACK = {
+      headline: '你好，我是和栗薰子，欢迎使用Deepseek Harness',
+      typewriter: true,
+      speed: 70,
+      cursor: true,
+      cursorChar: '|',
+      hideLogo: true,
+      hideBadge: true,
+    }
 
-    function renameHeadline(node) {
-      if (node.nodeType === 3) {
-        if (node.data.includes(HEADLINE_FROM)) node.data = node.data.split(HEADLINE_FROM).join(HEADLINE_TO)
-        return
+    let heroConfig = null
+
+    /** 宿主那份配置可能缺字段（老版本 / 半路升级），补上兜底再上屏。 */
+    function heroMerge(config) {
+      return Object.assign({}, HERO_FALLBACK, config || {})
+    }
+
+    /**
+     * 摘掉标题两边的装饰：同一个标题组里的其它孩子是「预览版」徽章，
+     * 标题组所在那一排里带 svg 的兄弟是 logo。都按结构找，DSH 换类名也不影响。
+     * 开关关掉时用 toggle 把类摘回去，所以设置页改完能立刻看到 logo/徽章回来。
+     */
+    function heroChrome(title) {
+      const group = title.parentElement
+      if (group === null) return
+      for (const child of group.children) {
+        if (child !== title) child.classList.toggle(HERO_HIDE, heroConfig.hideBadge === true)
       }
-      // 先廉价地看一眼 textContent，命中才逐文本节点走子树，免得每次 DOM 变动都白扫
-      if (node.nodeType !== 1 || !node.textContent.includes(HEADLINE_FROM)) return
-      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
-      let text
-      while ((text = walker.nextNode()) !== null) {
-        if (text.data.includes(HEADLINE_FROM)) text.data = text.data.split(HEADLINE_FROM).join(HEADLINE_TO)
+      const row = group.parentElement
+      if (row === null) return
+      for (const child of row.children) {
+        if (child === group) continue
+        if (child.querySelector('svg') !== null) child.classList.toggle(HERO_HIDE, heroConfig.hideLogo === true)
       }
     }
 
-    function watchHeadline() {
+    /**
+     * 接管标题：标记 + 装饰 + 逐字打出来。
+     * 定时器与状态都挂在元素自身上，所以 React 重挂载出来的新元素会自然从头播一遍。
+     */
+    function heroType(title) {
+      if (title.__dshsTyping === true) return
+      const config = heroConfig
+      title.setAttribute(HERO_MARK, '')
+      title.classList.toggle(HERO_TYPED, config.cursor === true)
+      title.style.setProperty('--dshs-hero-cursor', JSON.stringify(config.cursorChar || '|'))
+      heroChrome(title)
+      if (title.__dshsTimer) { clearInterval(title.__dshsTimer); title.__dshsTimer = 0 }
+      const chars = Array.from(config.headline)
+      if (config.typewriter !== true) {
+        title.textContent = config.headline
+        return
+      }
+      title.__dshsTyping = true
+      title.textContent = ''
+      let shown = 0
+      title.__dshsTimer = setInterval(() => {
+        shown += 1
+        // 按码点切，问候语里带 emoji 也不会被打成半个字符
+        title.textContent = chars.slice(0, shown).join('')
+        if (shown >= chars.length) {
+          clearInterval(title.__dshsTimer)
+          title.__dshsTimer = 0
+          title.__dshsTyping = false
+        }
+      }, Math.max(10, config.speed))
+    }
+
+    /** 从一处 DOM 变动里认出 hero 标题：原文出现的地方就是它。 */
+    function heroScan(node) {
+      if (heroConfig === null || node === null || node === undefined) return
+      if (node.nodeType === 3) {
+        if (node.data.includes(HERO_FROM) === true && node.parentElement !== null) heroType(node.parentElement)
+        return
+      }
+      // 先廉价地看一眼 textContent，没命中就不往子树里走
+      if (node.nodeType !== 1 || node.textContent === null || node.textContent.includes(HERO_FROM) === false) return
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+      let text = walker.nextNode()
+      while (text !== null) {
+        if (text.data.includes(HERO_FROM) === true && text.parentElement !== null) {
+          heroType(text.parentElement)
+          return
+        }
+        text = walker.nextNode()
+      }
+    }
+
+    /** 配置变了：把已经接管的标题停掉重播；一个都没有就把当前 DOM 扫一遍。 */
+    function heroReplay() {
+      const marked = document.querySelectorAll('[' + HERO_MARK + ']')
+      for (const title of marked) {
+        if (title.__dshsTimer) { clearInterval(title.__dshsTimer); title.__dshsTimer = 0 }
+        title.__dshsTyping = false
+        heroType(title)
+      }
+      if (marked.length === 0) heroScan(document.body)
+    }
+
+    function heroApply(config, replay) {
+      heroConfig = heroMerge(config)
+      if (replay === true) heroReplay()
+    }
+
+    function heroWatch() {
       if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return null
       const host = document.body || document.documentElement
       if (!host) return null
-      renameHeadline(host)   // 已经渲染出来的先扫一遍
+      heroScan(host)   // 已经渲染出来的先接管
       const observer = new MutationObserver((records) => {
+        if (heroConfig === null) return
         for (const record of records) {
-          if (record.type === 'characterData') { renameHeadline(record.target); continue }
-          for (const added of record.addedNodes) renameHeadline(added)
+          if (record.type === 'characterData') { heroScan(record.target); continue }
+          for (const added of record.addedNodes) heroScan(added)
         }
+        // React 重渲染会把 logo/徽章重新建出来，所以每轮变动后按标记把装饰补一遍
+        for (const title of document.querySelectorAll('[' + HERO_MARK + ']')) heroChrome(title)
       })
       observer.observe(host, { subtree: true, childList: true, characterData: true })
       return observer
     }
 
+    /** 页面侧拉一次配置；拿不到就什么都不做——宁可不改，也别用半份配置把标题改坏。 */
+    function heroLoad() {
+      // 自检脚本在没有 fetch / DOM 的 vm 沙箱里执行 apply，这里按环境跳过
+      if (typeof fetch !== 'function') return
+      fetch('/dsh-startup/config')
+        .then((answered) => answered.json())
+        .then((data) => { if (data && data.ok === true) heroApply(data.config, true) })
+        .catch(() => {})
+    }
+
     function apply(ctx) {
       // 客户端 HMR 重载会重跑 apply：先撤旧观察器再挂新的——既不叠加，
-      // 改了问候语文案也能随热更立刻生效（旧观察器还揣着旧文案，留着会抢着改回去）
-      if (window.__dshsHeadlineWatch) window.__dshsHeadlineWatch.disconnect()
-      window.__dshsHeadlineWatch = watchHeadline()
+      // 改了配置也能随热更立刻生效（旧观察器还揣着旧配置，留着会抢着改回去）
+      if (window.__dshsHeroWatch) window.__dshsHeroWatch.disconnect()
+      window.__dshsHeroWatch = heroWatch()
+      heroLoad()
       ctx.slots.inject('settings.section', () => ctx.slots.register(
         {
           name: 'settings.section',

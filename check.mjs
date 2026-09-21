@@ -53,6 +53,7 @@ assert.deepEqual(
     BASE + '/avatar',
     BASE + '/bg',
     BASE + '/boot.js',
+    BASE + '/config',
     BASE + '/images',
     BASE + '/images/avatar',
     BASE + '/images/avatar/reset',
@@ -60,7 +61,7 @@ assert.deepEqual(
     BASE + '/images/bg/reset',
     BASE + '/preview',
   ].sort(),
-  '九个路由必须都注册上',
+  '十个路由必须都注册上',
 )
 assert.equal(taps.length, 1, '必须只注册一个 index 注入')
 
@@ -113,6 +114,22 @@ assert.ok(splashCss.includes('@keyframes dshs-assemble'), 'boot.css 要有 dshs-
 assert.ok(splashCss.includes('--dshs-ax') && splashCss.includes('--dshs-ay'), '关键帧要消费组装起点变量')
 assert.ok(js.includes("'--dshs-ax'") && js.includes("'--dshs-ay'"), 'boot.js 要写入组装起点变量')
 
+// 5) 主界面 hero 改造：隐藏类与光标动画在 hero.css 里，client.js 负责挂类 + 写光标字符，
+//    两边名字必须对得上（这类手写 DOM 改造最容易在这里悄悄失配）。
+const heroCss = readFileSync(join(ASSETS, 'hero.css'), 'utf8')
+assert.ok(heroCss.includes('.dshs-hero-hide'), 'hero.css 要有隐藏 logo/徽章的类')
+assert.ok(heroCss.includes('@keyframes dshs-hero-blink'), 'hero.css 要有光标闪动关键帧')
+for (const name of ['dshs-hero-hide', 'dshs-hero-typed']) {
+  assert.ok(heroCss.includes('.' + name), `hero.css 里缺少 .${name}`)
+  assert.ok(clientJs.includes(name), `client.js 要用到 ${name}，否则这个类白写了`)
+}
+assert.ok(heroCss.includes('--dshs-hero-cursor'), '光标字符要能由 client.js 通过变量配置')
+assert.ok(clientJs.includes("'--dshs-hero-cursor'"), 'client.js 要把光标字符写进 --dshs-hero-cursor')
+assert.ok(heroCss.includes('prefers-reduced-motion'), 'hero.css 要在「减少动态效果」下让光标常亮')
+// 文案与开关都来自配置路由，client.js 不许再把问候语写死
+assert.ok(clientJs.includes("'/dsh-startup/config'"), 'client.js 要从配置路由取 hero 配置')
+assert.ok(clientJs.includes('探索未至之境') === true, 'client.js 要留着原文案当"找到 hero 标题"的锚点')
+
 // 4) 图片槽位：上传 → 生效 → 恢复默认，全程只碰临时目录
 const png = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -127,12 +144,15 @@ function fakeRes() {
     end(body) { this.body = body },
   }
 }
-function fakeReq(body) {
-  return Readable.from([body])
+function fakeReq(body, method) {
+  const req = Readable.from([body])
+  // 真实的 http.IncomingMessage 一定带 method；/config 靠它区分读和写，假请求也得给上
+  req.method = method || 'GET'
+  return req
 }
-async function call(path, body) {
+async function call(path, body, method) {
   const res = fakeRes()
-  await routes.get(path).handler(fakeReq(body), res)
+  await routes.get(path).handler(fakeReq(body, method), res)
   return res
 }
 function served(slot) {
@@ -168,6 +188,34 @@ routes.get(BASE + '/images').handler(fakeReq(Buffer.alloc(0)), stateRes)
 const state = JSON.parse(stateRes.body)
 assert.deepEqual(Object.keys(state).sort(), ['avatar', 'bg'])
 assert.equal(state.bg.custom, false)
+
+// 4b) hero 配置：读默认 → 局部保存（其余项不许被打回默认）→ 坏 JSON 被拒 → 恢复默认，全程只碰临时目录
+const readConfig = async () => JSON.parse((await call(BASE + '/config', Buffer.alloc(0))).body).config
+
+const fresh = await readConfig()
+assert.equal(fresh.headline, '你好，我是和栗薰子，欢迎使用Deepseek Harness', '默认问候语要能读出来')
+assert.equal(fresh.typewriter, true)
+assert.equal(fresh.hideLogo, true, '默认要摘掉 logo')
+assert.equal(fresh.hideBadge, true, '默认要摘掉「预览版」徽章')
+
+const patched = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ headline: '测试文案', speed: 200 })), 'POST')).body)
+assert.equal(patched.ok, true, '保存配置应成功')
+assert.equal(patched.config.headline, '测试文案')
+assert.equal(patched.config.speed, 200)
+assert.equal(patched.config.cursorChar, fresh.cursorChar, '只改了两个字段，其余项要保持原值')
+assert.equal((await readConfig()).headline, '测试文案', '保存后要真的落盘（重新读一次）')
+
+const clamped = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ speed: -5, cursor: 'yes', headline: 'x'.repeat(500) })), 'POST')).body)
+assert.equal(clamped.config.speed, 10, '速度要夹到下限')
+assert.equal(clamped.config.cursor, true, '类型不对的开关要退回原值')
+assert.equal(clamped.config.headline.length, 200, '超长文案要截断')
+
+const broken = await call(BASE + '/config', Buffer.from('{ 这不是 JSON'), 'POST')
+assert.equal(broken.status, 400, '坏 JSON 必须被拒')
+assert.ok(JSON.parse(broken.body).error.length > 0, '拒绝时要给得出原因')
+
+const restored = JSON.parse((await call(BASE + '/config', Buffer.from(JSON.stringify({ reset: true })), 'POST')).body)
+assert.deepEqual(restored.config, fresh, '恢复默认要回到最初那份')
 
 // 5) 客户端半边：真的执行一遍 factory，确认返回的插件与注册的页签都对
 const captured = {}
@@ -236,23 +284,46 @@ function flatten(node, out) {
   return out
 }
 
-/** 喂一份图片状态渲染设置页；传 null 就是"状态还没读回来"。 */
-function renderSection(state) {
+/** 喂一份图片状态 + 一份 hero 配置渲染设置页；传 null / undefined 就是"还没读回来"。 */
+function renderSection(state, config) {
   if (state !== null) stateQueue.push(state)
+  if (config !== undefined) stateQueue.push(config)
   return registrations[2]({})
 }
 
+const heroState = {
+  headline: '你好，我是和栗薰子，欢迎使用Deepseek Harness',
+  typewriter: true,
+  speed: 70,
+  cursor: true,
+  cursorChar: '|',
+  hideLogo: true,
+  hideBadge: true,
+}
 const loadedTree = flatten(renderSection({
   avatar: { custom: false, bytes: 4096 },
   bg: { custom: true, bytes: 8192, mtime: 1700000000000 },
-}), []).join(' ')
+}, heroState), []).join(' ')
 assert.ok(loadedTree.includes('iframe'), '设置页要有实时预览 iframe')
 assert.ok(loadedTree.includes('src=/dsh-startup/preview'), '预览 iframe 要指向宿主的预览路由')
 assert.ok(loadedTree.includes('sandbox=allow-scripts'), '预览 iframe 必须沙箱化，别让它碰真实页面的 sessionStorage')
 assert.ok(/src=\/dsh-startup\/bg\?v=1700000000000/.test(loadedTree), '换过图的槽位预览要带 mtime 版本号')
 assert.ok(loadedTree.includes('type=file'), '两个槽位都要有选图入口')
 assert.ok(loadedTree.includes('恢复默认'), '换过图的槽位要能恢复内置默认')
-const loadingTree = flatten(renderSection(null), []).join(' ')
+// 主界面标题卡片：问候语要带出来，四个开关都要在
+assert.ok(loadedTree.includes('主界面标题'), '设置页要有主界面标题卡片')
+assert.ok(loadedTree.includes('你好，我是和栗薰子，欢迎使用Deepseek Harness'), '卡片要带出当前问候语')
+for (const label of ['打字机逐字显示', '闪烁光标', '隐藏标题旁的 logo', '隐藏「预览版」徽章']) {
+  assert.ok(loadedTree.includes(label), `标题卡片要有「${label}」开关`)
+}
+assert.ok(loadedTree.includes('恢复默认'), '标题卡片要能恢复默认')
+// 配置没读回来时不该渲染这张卡片（否则输入框会以空值初始化，存盘就把配置清空了）
+const noConfigTree = flatten(renderSection({
+  avatar: { custom: false, bytes: 4096 },
+  bg: { custom: false, bytes: 8192 },
+}, undefined), []).join(' ')
+assert.ok(!noConfigTree.includes('主界面标题'), '配置没读回来之前不该渲染标题卡片')
+const loadingTree = flatten(renderSection(null, undefined), []).join(' ')
 assert.ok(!loadingTree.includes('iframe'), '状态没读回来之前不该挂 iframe（否则会连播两遍）')
 assert.ok(loadingTree.includes('正在读取图片状态'), '没读回来时要有占位')
 
@@ -263,6 +334,7 @@ if (existsSync(distIndex)) {
   const out = taps[0](shell)
   assert.ok(out.includes('<style id="dshs-css">'), '启动页样式必须注入')
   assert.ok(out.includes('<style id="dshs-wall-css">'), '壁纸样式必须注入')
+  assert.ok(out.includes('<style id="dshs-hero-css">'), 'hero 改造样式必须注入（hero 在主界面才渲染，不能只放启动页那份里）')
   assert.ok(out.includes(BOOT_SRC), 'boot.js 必须注入')
   assert.ok(out.indexOf('dshs-css') < out.indexOf('<body'), '关键样式必须落在 <head> 内')
   assert.ok(out.indexOf(BOOT_SRC) < out.indexOf('</body>'), 'boot.js 必须落在 </body> 前')
