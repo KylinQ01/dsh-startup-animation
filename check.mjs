@@ -139,7 +139,10 @@ assert.equal(activeFestival(AUTO, at('2026-07-01')), '', '夏天默认没有节�
 assert.equal(activeFestival({ festival: 'auto', birthday: '07-01' }, at('2026-07-01')), 'birthday', '生日优先于自动窗口')
 assert.equal(activeFestival({ festival: 'off', birthday: '07-01' }, at('2026-07-01')), '', '关掉之后连生日也不演')
 assert.equal(activeFestival({ festival: 'sakura', birthday: '' }, at('2026-07-01')), 'sakura', '手动指定不受日期限制')
-assert.equal(activeFestival({ festival: 'birthday', birthday: '' }, at('2026-07-01')), '', '手选了生日却没填日期，退回自动')
+// 手动选「生日」必须立刻演：日期只服务自动模式。
+// （之前要求先填日期，结果选完什么都不演 —— 用户实测踩到过这个坑。）
+assert.equal(activeFestival({ festival: 'birthday', birthday: '' }, at('2026-07-01')), 'birthday', '手选生日没填日期也要立刻演')
+assert.equal(activeFestival({ festival: 'auto', birthday: '07-01' }, at('2026-07-02')), '', '自动模式下生日只在那一天演')
 // 收尾交接靠"启动页背景 == 主界面壁纸"：白纱必须来自同一组变量，且主界面那张图也是 cover
 assert.ok(wallCss.includes('--dshs-wall-veil-a') && wallCss.includes('--dshs-wall-veil-b'), '壁纸白纱要定义成变量，供收尾那层复用')
 assert.ok(splashCss.includes('--dshs-wall-veil-a') && splashCss.includes('--dshs-wall-veil-b'), '收尾层要消费同一组白纱变量')
@@ -388,6 +391,9 @@ for (const label of ['省电', '标准', '华丽', '强制播放动效', '节日
 }
 assert.ok(loadedTree.includes('MM-DD'), '要有生日输入框（MM-DD 提示）')
 assert.ok(loadedTree.includes('今天没有节日特效'), '没有节日时要说明今天不演')
+// 60 秒内刷新会整段跳过动画，而"看效果"恰恰靠刷新 —— 卡片上必须给一个明确的重播入口
+assert.ok(loadedTree.includes('现在重播一次'), '启动动画卡片要有「现在重播一次」按钮')
+assert.ok(loadedTree.includes('60 秒内会整段跳过动画'), '要写清楚为什么普通刷新看不到动画')
 // 主界面标题卡片：问候语要带出来，四个开关都要在
 assert.ok(loadedTree.includes('主界面标题'), '设置页要有主界面标题卡片')
 assert.ok(loadedTree.includes('你好，我是和栗薰子，欢迎使用Deepseek Harness'), '卡片要带出当前问候语')

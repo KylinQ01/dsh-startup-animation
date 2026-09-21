@@ -72,7 +72,8 @@ window.__ModuleLoader__.load({
       { id: 'birthday', label: '生日' },
     ]
     const FESTIVAL_LABEL = { sakura: '樱花季', snow: '飘雪', newyear: '新年', birthday: '生日' }
-    const FESTIVAL_WINDOWS = '自动窗口：樱花 3/20~4/20 · 飘雪 12/1~2/15 · 新年 1/1~1/3 · 生日按你填的日期'
+    const FESTIVAL_WINDOWS = '自动窗口：樱花 3/20~4/20 · 飘雪 12/1~2/15 · 新年 1/1~1/3'
+    const FESTIVAL_MANUAL = '手动选一个＝"现在立刻演这一个"（选「生日」不用先填日期）；填了生日日期后，「跟随日期」会在那天自动演。'
 
     /** 改了档位/强制动效要立刻反映在页面上（节日配色只在启动页里用，页面上的类刷新后由宿主注入的脚本接手）。 */
     function applySplashClasses(config) {
@@ -362,7 +363,10 @@ window.__ModuleLoader__.load({
         ]),
         h('p', { key: 'today', style: Object.assign({}, styles.hint, { marginTop: 8 }) },
           today ? `今天生效：${FESTIVAL_LABEL[today] || today}` : '今天没有节日特效'),
-        h('p', { key: 'windows', style: styles.hint }, FESTIVAL_WINDOWS, '；生日留空＝不启用。'),
+        h('p', { key: 'windows', style: styles.hint }, FESTIVAL_WINDOWS),
+        h('p', { key: 'manual', style: styles.hint }, FESTIVAL_MANUAL),
+        h('p', { key: 'replayHint', style: styles.hint },
+          '看效果最快的办法：存盘后点「现在重播一次」。普通刷新在 60 秒内会整段跳过动画（免得自动重载一直演），存盘时我会顺手清掉那个标记。'),
         h('div', { key: 'acts', style: Object.assign({}, styles.row, { marginTop: 14 }) }, [
           h('button', {
             key: 'save',
@@ -378,6 +382,12 @@ window.__ModuleLoader__.load({
             disabled: busy,
             onClick: () => save({ reset: true }),
           }, '恢复默认'),
+          h('button', {
+            key: 'replay',
+            type: 'button',
+            style: styles.ghost,
+            onClick: props.onReplay,
+          }, '现在重播一次'),
           saved ? h('span', { key: 'ok', style: styles.ok }, '已生效 ✓') : null,
         ]),
         error ? h('p', { key: 'err', style: styles.err }, error) : null,
@@ -626,11 +636,13 @@ window.__ModuleLoader__.load({
         heroApply(next, true)
       }
 
-      /** 启动动画那边：档位与强制动效立刻挂到 <html> 上，节日只更新"今天"的显示。 */
+      /** 启动动画那边：档位与强制动效立刻挂到 <html> 上，节日只更新"今天"的显示。
+       *  顺手清掉"刚播过"的标记：存盘之后刷新一次就能看到新画面，不用再去找那个按钮。 */
       function splashSaved(next, today) {
         setConfig(next)
         setFestival(today || '')
         applySplashClasses(next)
+        try { sessionStorage.removeItem('dshs-at') } catch (err) { /* 忽略 */ }
       }
 
       return h('div', { style: styles.page, 'data-dshs-ui': '' }, [
@@ -639,7 +651,7 @@ window.__ModuleLoader__.load({
           '图片支持 PNG / JPEG / WebP / GIF，单张上限 12MB；点「选择图片」或直接把图拖到卡片上，',
           '换完上面的预览会自动重放一遍。'),
         h(Preview, { key: 'preview', state: state, config: config || undefined }),
-        config ? h(SplashCard, { key: 'splash', config: config, festival: festival, onSaved: splashSaved }) : null,
+        config ? h(SplashCard, { key: 'splash', config: config, festival: festival, onSaved: splashSaved, onReplay: replay }) : null,
         config ? h(HeroCard, { key: 'hero', config: config, onSaved: heroSaved }) : h('div', { key: 'hero', style: styles.formCard }, [
           h('p', { key: 'title', style: styles.title }, '主界面标题'),
           h('p', { key: 'hint', style: styles.hint }, config === null

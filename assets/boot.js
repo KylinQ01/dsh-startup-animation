@@ -45,9 +45,11 @@
   var STARS = TIER.stars
   var PETALS = TIER.petals
   var SPARKS = TIER.sparks
-  if (FESTIVAL === 'sakura') PETALS += 8
+  // 节日在档位基础上再加一层，但**不许低于标准档的量**：省电档基础花瓣是 0，
+  // 按"加 8"算只剩 8 片，选了半天樱花却几乎看不出来。
+  if (FESTIVAL === 'sakura') PETALS = Math.max(PETALS, COUNTS.standard.petals) + 8
   if (FESTIVAL === 'snow') PETALS = 0              // 下雪天就别再飘花瓣了，两种粒子一起飞很乱
-  if (FESTIVAL === 'newyear') SPARKS += 6
+  if (FESTIVAL === 'newyear') SPARKS = Math.max(SPARKS, COUNTS.standard.sparks) + 6
   var SNOW = FESTIVAL === 'snow' ? 18 : 0        // 飘雪：从上往下落
   var CONFETTI = FESTIVAL === 'birthday' ? 14 : 0 // 生日：彩色纸屑
 
