@@ -461,7 +461,7 @@ window.__ModuleLoader__.load({
         heroApply(next, true)
       }
 
-      return h('div', { style: styles.page }, [
+      return h('div', { style: styles.page, 'data-dshs-ui': '' }, [
         h('p', { key: 'lead', style: styles.lead },
           '换掉打开软件时的启动动画、主界面壁纸，以及主界面新会话那句标题。',
           '图片支持 PNG / JPEG / WebP / GIF，单张上限 12MB；点「选择图片」或直接把图拖到卡片上，',
@@ -580,11 +580,25 @@ window.__ModuleLoader__.load({
       }, Math.max(10, config.speed))
     }
 
-    /** 从一处 DOM 变动里认出 hero 标题：原文出现的地方就是它。 */
+    /**
+     * 设置页本身也是这个插件画的，而说明文字里就写着那句原文（「原来是『探索未至之境』」）。
+     * 不把这块排除掉的话，观察器会把它当成 hero 标题接管，再按"摘掉标题两边的装饰"把
+     * 卡片里的输入框/开关/按钮全藏起来 —— 表现就是"设置里那张卡片只剩一行字，改不了"。
+     */
+    function inOwnUi(node) {
+      const el = node.nodeType === 3 ? node.parentElement : node
+      return el !== null && el !== undefined && typeof el.closest === 'function' && el.closest('[data-dshs-ui]') !== null
+    }
+
+    /**
+     * 从一处 DOM 变动里认出 hero 标题。判定要**整段就是那句原文**（trim 后全等），
+     * 不能用"包含"：说明文字里只是提到它，包含判定会把设置页自己误伤。
+     */
     function heroScan(node) {
       if (heroConfig === null || node === null || node === undefined) return
+      if (inOwnUi(node)) return
       if (node.nodeType === 3) {
-        if (node.data.includes(HERO_FROM) === true && node.parentElement !== null) heroType(node.parentElement)
+        if (node.data.trim() === HERO_FROM && node.parentElement !== null) heroType(node.parentElement)
         return
       }
       // 先廉价地看一眼 textContent，没命中就不往子树里走
@@ -592,7 +606,7 @@ window.__ModuleLoader__.load({
       const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
       let text = walker.nextNode()
       while (text !== null) {
-        if (text.data.includes(HERO_FROM) === true && text.parentElement !== null) {
+        if (text.data.trim() === HERO_FROM && text.parentElement !== null) {
           heroType(text.parentElement)
           return
         }

@@ -129,6 +129,12 @@ assert.ok(heroCss.includes('prefers-reduced-motion'), 'hero.css 要在「减少�
 // 文案与开关都来自配置路由，client.js 不许再把问候语写死
 assert.ok(clientJs.includes("'/dsh-startup/config'"), 'client.js 要从配置路由取 hero 配置')
 assert.ok(clientJs.includes('探索未至之境') === true, 'client.js 要留着原文案当"找到 hero 标题"的锚点')
+// 认标题必须"整段全等"，且跳过插件自己的设置界面：设置卡片的说明文字里也含那句原文，
+// 用"包含"判定会把它当标题接管，再顺手把卡片里的输入框/开关/按钮全当徽章藏掉
+// —— 表现就是"设置里那张卡片只剩一行字，改不了"（真实踩过一次）。
+assert.ok(/trim\(\) === HERO_FROM/.test(clientJs), 'hero 标题要按整段文字精确匹配，不能用"包含"')
+assert.ok(clientJs.includes("'[data-dshs-ui]'"), 'hero 扫描要跳过插件自己的设置界面')
+assert.ok(clientJs.includes("'data-dshs-ui': ''"), '设置页根节点要带上 data-dshs-ui 标记')
 
 // 4) 图片槽位：上传 → 生效 → 恢复默认，全程只碰临时目录
 const png = Buffer.concat([
