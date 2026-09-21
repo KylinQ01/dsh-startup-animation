@@ -28,6 +28,8 @@
 
 最短演 1.5 秒，最多挡你 5 秒；**点一下或者按任意键**就能跳过。
 
+进主界面之后还有一处小改写：新会话标题「**探索未至之境**」会变成「**你好，我是和栗薰子，欢迎使用Deepseek Harness**」（文案在 `client/client.js` 里的 `HEADLINE_FROM` / `HEADLINE_TO`，改完 HMR 热更即生效）。
+
 而且——**两张图都能在设置里自己换**，换完当场就能预览，不用重启 👇
 
 ## 🎀 换图：设置 → 启动动画与壁纸
@@ -90,6 +92,7 @@ dsh --profile desktop --dump-config | Select-String startup-animation   # 看到
 | **头像 3D 倾斜幅度** | `.dshs-portrait` 的 `rotateY/rotateX` 里那两个 `6deg/5deg` |
 | **鼠标视差幅度** | `boot.css` 顶部三条 `translate: calc(var(--dshs-px) * Npx)`，改那个 N 就是改纵深 |
 | 主界面壁纸浓淡 / 侧栏透明度 | `assets/wallpaper.css` 的 `--dshs-wall-veil-a/b`（越大越淡）与 `--dsw-specific-sidebar-fill` |
+| **主界面问候语**（替换「探索未至之境」那句） | `client/client.js` 的 `HEADLINE_FROM` / `HEADLINE_TO`（客户端 HMR 热更，不用重启） |
 
 ## 🪶 为什么它不卡（低配机友好）
 

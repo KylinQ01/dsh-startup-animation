@@ -5,6 +5,9 @@
  *
  * 页面结构：顶上是一块实时预览（把宿主的预览页塞进 sandbox iframe，换图即重放），
  * 下面两张卡片分别管头像与背景图（点选或拖拽上传、可恢复内置默认图）。
+ *
+ * 除设置页外还顺手做一件事：把主界面新会话标题「探索未至之境」改写成自定义问候语
+ * （见下面的 HEADLINE_FROM / HEADLINE_TO，改文案由客户端 HMR 热更，不用重启宿主）。
  */
 window.__ModuleLoader__.load({
   id: 'dsh-startup-animation',
@@ -320,7 +323,47 @@ window.__ModuleLoader__.load({
       ])
     }
 
+    /* 主界面标题改写：新会话 hero 的「探索未至之境」来自会话组件内置的 i18n 字典
+     * （hero.headline），槽位机制拿不到字典，所以用 MutationObserver 直接改文本节点——
+     * React 重挂载（切新会话）会按字典重新渲染出原文，观察器会再把它改回来。
+     * 自检脚本会在没有 DOM 的 vm 沙箱里执行 apply，所以这里要按环境跳过。 */
+    const HEADLINE_FROM = '探索未至之境'
+    const HEADLINE_TO = '你好，我是和栗薰子，欢迎使用Deepseek Harness'
+
+    function renameHeadline(node) {
+      if (node.nodeType === 3) {
+        if (node.data.includes(HEADLINE_FROM)) node.data = node.data.split(HEADLINE_FROM).join(HEADLINE_TO)
+        return
+      }
+      // 先廉价地看一眼 textContent，命中才逐文本节点走子树，免得每次 DOM 变动都白扫
+      if (node.nodeType !== 1 || !node.textContent.includes(HEADLINE_FROM)) return
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+      let text
+      while ((text = walker.nextNode()) !== null) {
+        if (text.data.includes(HEADLINE_FROM)) text.data = text.data.split(HEADLINE_FROM).join(HEADLINE_TO)
+      }
+    }
+
+    function watchHeadline() {
+      if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return null
+      const host = document.body || document.documentElement
+      if (!host) return null
+      renameHeadline(host)   // 已经渲染出来的先扫一遍
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === 'characterData') { renameHeadline(record.target); continue }
+          for (const added of record.addedNodes) renameHeadline(added)
+        }
+      })
+      observer.observe(host, { subtree: true, childList: true, characterData: true })
+      return observer
+    }
+
     function apply(ctx) {
+      // 客户端 HMR 重载会重跑 apply：先撤旧观察器再挂新的——既不叠加，
+      // 改了问候语文案也能随热更立刻生效（旧观察器还揣着旧文案，留着会抢着改回去）
+      if (window.__dshsHeadlineWatch) window.__dshsHeadlineWatch.disconnect()
+      window.__dshsHeadlineWatch = watchHeadline()
       ctx.slots.inject('settings.section', () => ctx.slots.register(
         {
           name: 'settings.section',
