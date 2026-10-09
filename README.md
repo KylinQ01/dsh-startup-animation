@@ -74,6 +74,12 @@
 
 ## 🚀 安装
 
+> 🖥 **用 DeepSeek 官方桌面版？请装 [`official-desktop` 分支](https://github.com/KylinQ01/dsh-startup-animation/tree/official-desktop)**
+> （`git clone -b official-desktop https://github.com/KylinQ01/dsh-startup-animation.git`）。
+> 官方桌面版的 `index.html` 由 Electron 外壳从打包好的 dist 直接吐出，`webServer.tapIndex`
+> 永远不会执行 —— 这个 `main` 分支装上去**不会有启动动画与壁纸**（设置页正常）。
+> 症状、根因与改法见 [`DESKTOP-FIX.md`](https://github.com/KylinQ01/dsh-startup-animation/blob/official-desktop/DESKTOP-FIX.md)。
+
 ```powershell
 git clone https://github.com/KylinQ01/dsh-startup-animation.git
 ```
