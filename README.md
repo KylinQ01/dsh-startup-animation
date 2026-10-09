@@ -74,9 +74,25 @@
 
 ## 🚀 安装
 
+**这份插件有两条分支，按你用的桌面壳选一条装**（只差 `lib/index.js` 与 `check.mjs`，其余文件完全相同）：
+
+| 你在用哪个 | 装哪条分支 | 为什么 |
+| --- | --- | --- |
+| **DeepSeek 官方桌面版**<br>（`@deepseek-ai/dsh-desktop`，页面 origin 是 `dsh-app://app/`） | **`official-desktop`** | 官方桌面版的 `index.html` 是外壳从打包好的 `dsh-web-frontend/dist` 直接吐出来的，`webServer.tapIndex` **永远不会执行**；这条分支额外用 `webserver/index-inject` 的结构化行把启动页送进页面 |
+| **社区桌面版 / `dsh web`**<br>（宿主自己渲染 index） | **`main`**（默认） | 走 `tapIndex`，一直都是好的 |
+
 ```powershell
+# DeepSeek 官方桌面版
+git clone -b official-desktop https://github.com/KylinQ01/dsh-startup-animation.git
+
+# 社区桌面版 / dsh web
 git clone https://github.com/KylinQ01/dsh-startup-animation.git
 ```
+
+> `official-desktop` 分支**保留了 `tapIndex`**（`inject()` 见到结构化行的标记就让位，宿主渲染路径下实测不重复注入），
+> 所以它在社区桌面版 / `dsh web` 上也能用；
+> 反过来 `main` 装在官方桌面版上**不会显示启动动画与壁纸**（设置页正常）。
+> 差别与原理见 [`DESKTOP-FIX.md`](DESKTOP-FIX.md)。
 
 然后把依赖写进 profile 的 `package.json`（`link:` 指向刚 clone 下来的目录）：
 

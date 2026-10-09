@@ -27,9 +27,14 @@ const { default: plugin, activeFestival } = await import('./lib/index.js')
 // 1) 用假 ctx 跑一遍 apply，收下路由、index 注入与日志
 const routes = new Map()
 const taps = []
+const listeners = []
 const logs = []
 plugin.apply({
   logger: () => ({ info: (line) => logs.push(line), warn: () => {}, error: () => {} }),
+  on(name, listener) {
+    listeners.push({ name, listener })
+    return () => {}
+  },
   webServer: {
     register(route) {
       routes.set(route.path, route)
@@ -59,11 +64,33 @@ assert.deepEqual(
     BASE + '/images/avatar/reset',
     BASE + '/images/bg',
     BASE + '/images/bg/reset',
+    BASE + '/preload.js',
     BASE + '/preview',
   ].sort(),
-  '十个路由必须都注册上',
+  '十一个路由必须都注册上（preload.js 是桌面版现读配置那条）',
 )
 assert.equal(taps.length, 1, '必须只注册一个 index 注入')
+
+// 1b) 桌面版只认结构化注入行：页面侧拿到的是这张表，而不是 taps。
+// 这里按页面侧解释器的顺序核对一遍 —— 行少一条，桌面版就是"什么动画都没有"。
+const table = []
+for (const entry of listeners) if (entry.name === 'webserver/index-inject') entry.listener(table)
+assert.equal(table.length, 5, '注入表要有五行：三段 CSS + preload.js + boot.js')
+const rowsOf = (kind) => table.filter((row) => row.kind === kind)
+assert.deepEqual(
+  rowsOf('script-src').map((row) => row.src),
+  [BASE + '/preload.js', BASE + '/boot.js'],
+  '两个脚本都要以 script-src 行给出，且 preload 必须排在 boot 前面（配置要先于动画就位）',
+)
+for (const id of ['dshs-css', 'dshs-wall-css', 'dshs-hero-css']) {
+  assert.ok(
+    table.some((row) => row.kind === 'html' && row.html.includes(`<style id="${id}">`)),
+    `行里要有 ${id}：style 行渲染出来的标签没有 id，收尾时摘不掉`,
+  )
+}
+for (const row of rowsOf('script-src')) {
+  assert.ok(routes.has(new URL(row.src, 'http://x').pathname), `行里的脚本没有对应路由：${row.src}`)
+}
 
 // 2) 页面里引用的每个 /dsh-startup/* 都得有对应路由，否则静默 404
 const splashCss = readFileSync(join(ASSETS, 'boot.css'), 'utf8')
