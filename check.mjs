@@ -75,12 +75,14 @@ assert.equal(taps.length, 1, '必须只注册一个 index 注入')
 // 这里按页面侧解释器的顺序核对一遍 —— 行少一条，桌面版就是"什么动画都没有"。
 const table = []
 for (const entry of listeners) if (entry.name === 'webserver/index-inject') entry.listener(table)
-assert.equal(table.length, 5, '注入表要有五行：三段 CSS + preload.js + boot.js')
+assert.equal(table.length, 6, '注入表要有六行：三段 CSS + 早脚本 + preload.js + boot.js')
 const rowsOf = (kind) => table.filter((row) => row.kind === kind)
-assert.deepEqual(
-  rowsOf('script-src').map((row) => row.src),
-  [BASE + '/preload.js', BASE + '/boot.js'],
-  '两个脚本都要以 script-src 行给出，且 preload 必须排在 boot 前面（配置要先于动画就位）',
+assert.equal(
+  rowsOf('script-src').length,
+  0,
+  '行里不许出现 script-src：页面侧对它是 await loadScript(src)，失败即 reject 掉 __DSH_BOOT_READY__（应用起不来）；'
+    + '而外壳把注入表在宿主启动时收集一次后缓存、没有刷新路径 —— 插件在运行期被关掉时表里还留着那一行、'
+    + '路由已注销，加载 404 就把应用钉死在启动阶段（issue #154）',
 )
 for (const id of ['dshs-css', 'dshs-wall-css', 'dshs-hero-css']) {
   assert.ok(
@@ -88,8 +90,31 @@ for (const id of ['dshs-css', 'dshs-wall-css', 'dshs-hero-css']) {
     `行里要有 ${id}：style 行渲染出来的标签没有 id，收尾时摘不掉`,
   )
 }
-for (const row of rowsOf('script-src')) {
-  assert.ok(routes.has(new URL(row.src, 'http://x').pathname), `行里的脚本没有对应路由：${row.src}`)
+const scriptRows = rowsOf('script')
+assert.equal(scriptRows.length, 3, '三段内联脚本：早脚本本体 + preload 装载器 + boot 装载器')
+assert.ok(
+  scriptRows[0].placement === 'head'
+    && scriptRows[0].text.includes('dshs-boot')
+    && !scriptRows[0].text.includes('createElement'),
+  '第一段必须是同步的早脚本本体（趁首帧前把主界面藏起来），不能是装载器',
+)
+const loaders = scriptRows.slice(1)
+assert.ok(
+  loaders[0].text.includes(`${BASE}/preload.js`) && loaders[1].text.includes(`${BASE}/boot.js`),
+  '装载器顺序必须是 preload 在前、boot 在后（配置要先于动画就位）',
+)
+for (const row of loaders) {
+  assert.ok(
+    row.text.includes('async=false'),
+    '装载器要 async=false：动态插入的脚本默认异步，会打乱 preload → boot 的顺序',
+  )
+  assert.ok(
+    row.text.includes('onerror'),
+    '装载器必须吞掉 onerror：加载失败只能退化成"这次不放动画"，不能 reject 整个 boot',
+  )
+  for (const [url] of row.text.matchAll(/\/dsh-startup\/[\w.-]+/g)) {
+    assert.ok(routes.has(url), `装载器引用的脚本没有对应路由：${url}`)
+  }
 }
 
 // 2) 页面里引用的每个 /dsh-startup/* 都得有对应路由，否则静默 404

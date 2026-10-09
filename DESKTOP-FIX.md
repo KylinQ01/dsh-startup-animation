@@ -34,17 +34,39 @@
 
 - 三段 CSS 用 `html` 行 —— 因为 `style` 行渲染出来的 `<style>` **没有 id**，
   而启动页收尾要靠 `getElementById('dshs-css')` 摘样式；
-- `boot.js` 与新增的 `/dsh-startup/preload.js` 用 `script-src` 行。
-  配置与早脚本（`__dshsConfig` + `dshs-boot`）必须**每次页面加载现读**，
-  而行是宿主启动时的快照，所以这部分放进新路由 `preload.js`；
+- **早脚本本体内联**成 `script` 行（`EARLY_BODY` 是纯静态代码：只看 `sessionStorage`
+  并给 `<html>` 加类名）。行应用完才 resolve `__DSH_BOOT_READY__`，所以它一定赶在
+  应用挂载前跑完，白底一闪照样挡得住，而且零网络、不可能失败；
+- 配置与动画由**内联装载器**挂真实 `<script src>`：`/dsh-startup/preload.js` 进 head、
+  `boot.js` 进 body。配置必须**每次页面加载现读**，而行是宿主启动时的快照，
+  所以这一半仍旧走路由。`s.async=false` 保住 preload → boot 的执行顺序，
+  `s.onerror` 吞掉失败。
 - `inject()` 见到 `preload.js` 标记就让位，两条通路谁在跑都不会插双份。
 
-页面侧解释器会**按顺序 await 每个 `script-src`**，且整张表应用完才 resolve
-`__DSH_BOOT_READY__`（应用在此之前不会挂载），所以启动页仍然先于主界面出现。
+## 加固：为什么最终一行 `script-src` 都不用（issue #154）
+
+页面侧解释器对两种 script 行的处理**不对称**：
+
+| 行 | 解释器怎么做 | 失败会怎样 |
+| --- | --- | --- |
+| `script`（内联） | `createElement` + `textContent` + append | 没有网络，**不可能失败** |
+| `script-src` | `await loadScript(src)` | **reject ⇒ 连带 reject `__DSH_BOOT_READY__` ⇒ 应用起不来** |
+
+再加上一层：外壳把这张注入表在**宿主启动时收集一次就缓存，没有任何刷新路径** ——
+插件在运行期被关掉（比如在插件管理里禁用）时，表里仍留着那一行，而 `/dsh-startup/*`
+路由已经注销，加载 404 就把应用钉死在启动阶段。`dsh-whale-widget` 0.3.18 的源码注释里
+记了这个坑（issue #154），它也是改成内联行 + 吞 `onerror` 的。
+
+所以这里的取舍是：**宁可"这次不放动画"，也不能"应用起不来"**。
+早脚本内联后不存在时序回退（它本就同步执行）；只有配置与动画退化成动态加载，
+而它们的顺序由 `async=false` 保证，最坏情况是启动页不播、8 秒后主界面自己放行。
 
 ## 验证方式
 
-- `node check.mjs`（Node 18+）：含新路由与新注入行的断言；
+- `node check.mjs`（Node 18+）：含新路由与新注入行的断言，并**明确断言 `script-src` 行数为 0**、
+  第一段必须是早脚本本体、两个装载器必须带 `async=false` 与 `onerror`；
 - 宿主侧路由：`/dsh-startup/preload.js` 应返回现读的配置 + 早脚本；
+- 宿主渲染路径实测（`dsh <profile>` 后取 `/`）：两个装载器原文正确、`async=false` 与
+  `onerror` 各 2 处、`<script src="/dsh-startup…">` 静态标签 0 个、`dshs-css` 无重复注入；
 - 造一个"外壳形态"的页面（打包 index.html + `__DSH_BOOT_READY__` +
   `dshDesktopBoot.ready()` 返回这张行表）在浏览器里打开，应看到完整启动动画。
